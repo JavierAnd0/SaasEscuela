@@ -1,32 +1,36 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard, ClipboardList, PenSquare, TrendingUp,
+  Sparkles, FileText, Send, Settings, Users, GraduationCap, LogOut,
+} from 'lucide-react';
 import { useFirebaseAuth } from '../../modules/auth/hooks/useFirebaseAuth';
 import useAuthStore from '../../modules/auth/store/auth.store';
 
 const ROLE_MENUS = {
   coordinator: [
-    { to: '/app/dashboard',      icon: '📊', label: 'Dashboard' },
-    { to: '/app/attendance',     icon: '📋', label: 'Asistencia' },
-    { to: '/app/grades',         icon: '📝', label: 'Notas' },
-    { to: '/app/consolidation',  icon: '📈', label: 'Consolidación' },
-    { to: '/app/comments',       icon: '🤖', label: 'Comentarios IA' },
-    { to: '/app/report-cards',   icon: '📄', label: 'Boletines' },
-    { to: '/app/delivery',       icon: '📲', label: 'Entrega' },
+    { to: '/app/dashboard',      Icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/app/attendance',     Icon: ClipboardList,   label: 'Asistencia' },
+    { to: '/app/grades',         Icon: PenSquare,       label: 'Notas' },
+    { to: '/app/consolidation',  Icon: TrendingUp,      label: 'Consolidación' },
+    { to: '/app/comments',       Icon: Sparkles,        label: 'Comentarios IA' },
+    { to: '/app/report-cards',   Icon: FileText,        label: 'Boletines' },
+    { to: '/app/delivery',       Icon: Send,            label: 'Entrega' },
   ],
   teacher: [
-    { to: '/app/attendance',     icon: '📋', label: 'Asistencia' },
-    { to: '/app/grades',         icon: '📝', label: 'Notas' },
-    { to: '/app/comments',       icon: '🤖', label: 'Mis comentarios' },
+    { to: '/app/attendance',     Icon: ClipboardList,   label: 'Asistencia' },
+    { to: '/app/grades',         Icon: PenSquare,       label: 'Notas' },
+    { to: '/app/comments',       Icon: Sparkles,        label: 'Mis comentarios' },
   ],
   school_admin: [
-    { to: '/app/dashboard',      icon: '📊', label: 'Dashboard' },
-    { to: '/app/attendance',     icon: '📋', label: 'Asistencia' },
-    { to: '/app/grades',         icon: '📝', label: 'Notas' },
-    { to: '/app/admin/config',   icon: '⚙️',  label: 'Configuración' },
-    { to: '/app/admin/users',    icon: '👥', label: 'Usuarios' },
+    { to: '/app/dashboard',      Icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/app/attendance',     Icon: ClipboardList,   label: 'Asistencia' },
+    { to: '/app/grades',         Icon: PenSquare,       label: 'Notas' },
+    { to: '/app/admin/config',   Icon: Settings,        label: 'Configuración' },
+    { to: '/app/admin/users',    Icon: Users,           label: 'Usuarios' },
   ],
   superadmin: [
-    { to: '/superadmin/schools', icon: '🏫', label: 'Colegios' },
+    { to: '/superadmin/schools', Icon: GraduationCap,  label: 'Colegios' },
   ],
 };
 
@@ -49,7 +53,7 @@ export default function AppLayout() {
       <aside className={`${sidebarOpen ? 'w-56' : 'w-16'} flex-shrink-0 bg-primary-900 text-white flex flex-col transition-all duration-200`}>
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-primary-800">
-          <span className="text-2xl">🏫</span>
+          <GraduationCap size={22} className="flex-shrink-0 text-primary-200" />
           {sidebarOpen && <span className="font-bold text-sm truncate">SaasColegio</span>}
         </div>
 
@@ -67,7 +71,7 @@ export default function AppLayout() {
                  }`
               }
             >
-              <span className="text-base flex-shrink-0">{item.icon}</span>
+              <item.Icon size={17} className="flex-shrink-0" />
               {sidebarOpen && <span className="truncate">{item.label}</span>}
             </NavLink>
           ))}
@@ -90,7 +94,7 @@ export default function AppLayout() {
             onClick={handleLogout}
             className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-primary-300 hover:text-white hover:bg-primary-800 rounded-lg transition-colors"
           >
-            <span>🚪</span>
+            <LogOut size={15} />
             {sidebarOpen && 'Cerrar sesión'}
           </button>
         </div>

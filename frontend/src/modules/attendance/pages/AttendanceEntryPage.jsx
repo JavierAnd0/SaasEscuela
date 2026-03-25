@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
+import { ClipboardList } from 'lucide-react';
 import AttendanceGrid from '../components/AttendanceGrid';
 import { attendanceApi } from '../api/attendance.api';
 import apiClient from '../../../shared/api/client';
-import useAuthStore from '../../auth/store/auth.store';
-
 export default function AttendanceEntryPage() {
-  const { user } = useAuthStore();
-
   // Filtros
   const [classrooms,   setClassrooms]   = useState([]);
   const [periods,      setPeriods]       = useState([]);
@@ -24,7 +21,7 @@ export default function AttendanceEntryPage() {
   // Carga grupos y períodos al montar
   useEffect(() => {
     apiClient.get('/classrooms').then(r => setClassrooms(r.data?.data || [])).catch(() => {});
-    apiClient.get('/periods').then(r => setPeriods(r.data?.data || [])).catch(() => {});
+    apiClient.get('/periods').then(r => setPeriods(r.data?.data   || [])).catch(() => {});
   }, []);
 
   // Carga estudiantes y asistencia existente al cambiar filtros
@@ -56,7 +53,7 @@ export default function AttendanceEntryPage() {
     setSaving(true);
     try {
       await attendanceApi.bulkRecord({ classroomId, periodId, recordDate, records });
-      showToast(`✅ Asistencia guardada para ${records.length} estudiantes.`);
+      showToast(`Asistencia guardada para ${records.length} estudiantes.`);
     } catch (err) {
       showToast(err.response?.data?.error || 'Error al guardar.', 'error');
     } finally {
@@ -68,7 +65,10 @@ export default function AttendanceEntryPage() {
     <div className="max-w-4xl">
       {/* Encabezado */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">📋 Registro de Asistencia</h1>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <ClipboardList size={24} className="text-primary-600" />
+          Registro de Asistencia
+        </h1>
         <p className="text-gray-500 mt-1 text-sm">Registre la asistencia diaria de su grupo</p>
       </div>
 

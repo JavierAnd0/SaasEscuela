@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Construction } from 'lucide-react';
 import { useFirebaseAuth } from './modules/auth/hooks/useFirebaseAuth';
 
 // Layout y utilidades
@@ -12,11 +13,23 @@ import LoginPage from './modules/auth/pages/LoginPage';
 import AttendanceEntryPage     from './modules/attendance/pages/AttendanceEntryPage';
 import AttendanceDashboardPage from './modules/attendance/pages/AttendanceDashboardPage';
 
+// Páginas notas
+import GradeEntryPage from './modules/grades/pages/GradeEntryPage';
+
+// Módulos completados
+import UsersPage            from './modules/users/pages/UsersPage';
+import DashboardPage        from './modules/dashboard/pages/DashboardPage';
+import ConsolidationPage    from './modules/consolidation/pages/ConsolidationPage';
+import CommentsPage         from './modules/comments/pages/CommentsPage';
+import ReportCardsPage      from './modules/report-cards/pages/ReportCardsPage';
+import DeliveryPage         from './modules/delivery/pages/DeliveryPage';
+import PublicReportCardPage from './modules/report-cards/pages/PublicReportCardPage';
+
 // Placeholder para módulos futuros
 function ComingSoon({ name }) {
   return (
     <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-      <span className="text-5xl mb-4">🚧</span>
+      <Construction size={48} className="mb-4 text-gray-300" />
       <p className="font-medium text-lg">{name}</p>
       <p className="text-sm mt-1">Próximamente disponible</p>
     </div>
@@ -44,24 +57,24 @@ export default function App() {
           }
         >
           {/* Dashboard coordinador */}
-          <Route path="dashboard"  element={<ComingSoon name="Dashboard Coordinador" />} />
+          <Route path="dashboard"  element={<DashboardPage />} />
 
           {/* Asistencia */}
           <Route path="attendance"          element={<AttendanceEntryPage />} />
           <Route path="attendance/dashboard" element={<AttendanceDashboardPage />} />
 
           {/* Notas */}
-          <Route path="grades"     element={<ComingSoon name="Ingreso de Notas" />} />
+          <Route path="grades" element={<GradeEntryPage />} />
 
-          {/* Módulos futuros */}
-          <Route path="consolidation" element={<ComingSoon name="Consolidación y Promedios" />} />
-          <Route path="comments"      element={<ComingSoon name="Comentarios IA" />} />
-          <Route path="report-cards"  element={<ComingSoon name="Boletines PDF" />} />
-          <Route path="delivery"      element={<ComingSoon name="Entrega a Padres" />} />
+          {/* Módulos completados */}
+          <Route path="consolidation" element={<ConsolidationPage />} />
+          <Route path="comments"      element={<CommentsPage />} />
+          <Route path="report-cards"  element={<ReportCardsPage />} />
+          <Route path="delivery"      element={<DeliveryPage />} />
 
           {/* Admin */}
           <Route path="admin/config"  element={<ComingSoon name="Configuración del Colegio" />} />
-          <Route path="admin/users"   element={<ComingSoon name="Gestión de Usuarios" />} />
+          <Route path="admin/users"   element={<UsersPage />} />
 
           {/* Default redirect */}
           <Route index element={<Navigate to="attendance" replace />} />
@@ -78,7 +91,7 @@ export default function App() {
         />
 
         {/* Vista pública de boletín para padres */}
-        <Route path="/p/:token" element={<ComingSoon name="Boletín del Estudiante" />} />
+        <Route path="/p/:token" element={<PublicReportCardPage />} />
 
         {/* Redirect raíz */}
         <Route path="/" element={<Navigate to="/app/attendance" replace />} />
