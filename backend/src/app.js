@@ -37,6 +37,7 @@ const commentsRouter      = require('./presentation/comments/comments.routes');
 const reportCardsRouter   = require('./presentation/report-cards/report-cards.routes');
 const deliveryRouter      = require('./presentation/delivery/delivery.routes');
 const portalRouter        = require('./presentation/portal/portal.routes');
+const exportRouter        = require('./presentation/export/export.routes');
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use('/api/v1/comments',      commentsRouter);
 app.use('/api/v1/report-cards',  reportCardsRouter);
 app.use('/api/v1/delivery',      deliveryRouter);
 app.use('/api/v1/portal',        portalRouter);
+app.use('/api/v1/export',        exportRouter);
 
 // Static file serving para PDFs en desarrollo local
 // En producción los PDFs deben servirse desde Cloudflare R2 con URLs firmadas.
