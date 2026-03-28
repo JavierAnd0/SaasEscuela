@@ -7,7 +7,7 @@ const { validate }               = require('../middlewares/validate.middleware')
 const { BulkGradesSchema, GradeQuerySchema } = require('./grades.schema');
 const ctrl = require('./grades.controller');
 const db   = require('../../infrastructure/database/knex/config');
-const { requireOpenPeriod } = require('../middlewares/requireOpenPeriod.middleware');
+const { requireGradeWindow } = require('../middlewares/requireOpenPeriod.middleware');
 
 /**
  * POST /api/v1/grades/bulk
@@ -18,7 +18,7 @@ router.post(
   ...auth,
   roles('teacher', 'coordinator', 'school_admin'),
   validate(BulkGradesSchema),
-  requireOpenPeriod,
+  requireGradeWindow,
   ctrl.bulkSave
 );
 

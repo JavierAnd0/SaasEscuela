@@ -31,7 +31,10 @@ const CreateStudentSchema = z.object({
   firstName:      studentFields.firstName,
   lastName:       studentFields.lastName,
   documentNumber: studentFields.documentNumber,
-});
+}).refine(
+  d => !d.parentDocumentNumber || d.parentDocumentNumber.trim() !== d.documentNumber.trim(),
+  { message: 'El documento del acudiente no puede ser igual al del estudiante.', path: ['parentDocumentNumber'] }
+);
 
 // ─── Schema: Actualizar estudiante (todos opcionales) ─────────────────────────
 
@@ -48,7 +51,10 @@ const UpdateStudentSchema = z.object({
   parentDocumentNumber: z.string().trim().max(30).nullable().optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'Se requiere al menos un campo para actualizar.',
-});
+}).refine(
+  d => !d.parentDocumentNumber || !d.documentNumber || d.parentDocumentNumber.trim() !== d.documentNumber.trim(),
+  { message: 'El documento del acudiente no puede ser igual al del estudiante.', path: ['parentDocumentNumber'] }
+);
 
 // ─── Schema: Matricular en grupo ──────────────────────────────────────────────
 

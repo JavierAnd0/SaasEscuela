@@ -17,13 +17,14 @@ const dashboardUseCase = new GetTeacherAttendanceDashboardUseCase(attendanceRepo
  */
 async function bulkRecord(req, res, next) {
   try {
-    const { classroomId, periodId, recordDate, records } = req.body;
+    const { classroomId, periodId, subjectId, recordDate, records } = req.body;
     const result = await recordUseCase.execute({
       schoolId:    req.schoolId,
       classroomId,
       periodId,
+      subjectId:   subjectId ?? null,
       recordDate,
-      recordedBy:  req.user.uid,
+      recordedBy:  req.user.dbId,
       records,
     });
     res.status(201).json({ data: result, count: result.length });
@@ -46,6 +47,7 @@ async function getAttendance(req, res, next) {
         schoolId:     req.schoolId,
         classroomId,
         recordDate:   date,
+        subjectId:    req.query.subjectId || null,
       });
       return res.json({ data: records });
     }

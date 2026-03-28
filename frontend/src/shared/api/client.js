@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as Sentry from '@sentry/react';
 import { auth } from '../firebase/firebaseConfig';
 
 const apiClient = axios.create({
@@ -6,7 +7,7 @@ const apiClient = axios.create({
   timeout: 30000,
 });
 
-// Interceptor: adjunta el Firebase ID token en cada request
+// ─── Request interceptor: adjunta el Firebase ID token ───────────────────────
 apiClient.interceptors.request.use(async (config) => {
   const user = auth.currentUser;
   if (user) {
@@ -16,19 +17,36 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Interceptor: manejo global de errores de respuesta
+// ─── Response interceptor: manejo global de errores ──────────────────────────
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expirado o inválido — Firebase lo refresca automáticamente
-      // Si persiste, redirigir al login
+    const status = error.response?.status;
+
+    // 401 — Token expirado / inválido
+    if (status === 401) {
       window.location.href = '/login';
+      return Promise.reject(error);
     }
-    if (error.response?.status === 402) {
-      // Suscripción vencida o suspendida — mostrar página informativa
+
+    // 402 — Suscripción vencida o suspendida
+    if (status === 402) {
       window.location.href = '/subscription-required';
+      return Promise.reject(error);
     }
+
+    // 5xx — Error de servidor: reportar a Sentry con contexto
+    if (status >= 500) {
+      Sentry.captureException(error, {
+        extra: {
+          url:    error.config?.url,
+          method: error.config?.method,
+          status,
+          data:   error.response?.data,
+        },
+      });
+    }
+
     return Promise.reject(error);
   }
 );

@@ -136,6 +136,35 @@ router.post('/',
   validate(CreateStudentSchema),
   async (req, res, next) => {
     try {
+      const docType  = req.body.documentType  || 'TI';
+      const docNum   = req.body.documentNumber.trim();
+      const parentDoc = req.body.parentDocumentNumber?.trim() || null;
+
+      // 1. Verificar unicidad del documento del estudiante
+      const dup = await db('students')
+        .where({ school_id: req.schoolId, document_type: docType, document_number: docNum })
+        .first('id');
+      if (dup) {
+        return res.status(409).json({
+          error: `Ya existe un estudiante con ${docType} ${docNum} en este colegio.`,
+          field: 'documentNumber',
+        });
+      }
+
+      // 2. Verificar que el documento del acudiente no corresponda a un estudiante registrado
+      if (parentDoc) {
+        const clash = await db('students')
+          .where({ school_id: req.schoolId })
+          .whereRaw('document_number = ?', [parentDoc])
+          .first('id', 'first_name', 'last_name', 'document_type');
+        if (clash) {
+          return res.status(422).json({
+            error: `El documento del acudiente (${parentDoc}) pertenece a un estudiante ya registrado: ${clash.first_name} ${clash.last_name} (${clash.document_type} ${parentDoc}).`,
+            field: 'parentDocumentNumber',
+          });
+        }
+      }
+
       const [student] = await db('students')
         .insert({ school_id: req.schoolId, ...toDbColumns(req.body) })
         .returning('*');
@@ -157,11 +186,51 @@ router.put('/:id',
   validate(UpdateStudentSchema),
   async (req, res, next) => {
     try {
+      const current = await db('students')
+        .where({ id: req.params.id, school_id: req.schoolId })
+        .first();
+      if (!current) return res.status(404).json({ error: 'Estudiante no encontrado.' });
+
+      // Valores resultantes tras el update (mezcla de lo que viene y lo que ya existe)
+      const docType  = req.body.documentType   ?? current.document_type;
+      const docNum   = (req.body.documentNumber ?? current.document_number).trim();
+      const parentDoc = req.body.parentDocumentNumber !== undefined
+        ? (req.body.parentDocumentNumber?.trim() || null)
+        : current.parent_document_number;
+
+      // 1. Unicidad del documento del estudiante (excluyendo el propio registro)
+      if (req.body.documentNumber !== undefined || req.body.documentType !== undefined) {
+        const dup = await db('students')
+          .where({ school_id: req.schoolId, document_type: docType, document_number: docNum })
+          .whereNot('id', req.params.id)
+          .first('id');
+        if (dup) {
+          return res.status(409).json({
+            error: `Ya existe otro estudiante con ${docType} ${docNum} en este colegio.`,
+            field: 'documentNumber',
+          });
+        }
+      }
+
+      // 2. El documento del acudiente no puede corresponder a otro estudiante
+      if (parentDoc && req.body.parentDocumentNumber !== undefined) {
+        const clash = await db('students')
+          .where({ school_id: req.schoolId })
+          .whereRaw('document_number = ?', [parentDoc])
+          .whereNot('id', req.params.id)
+          .first('id', 'first_name', 'last_name', 'document_type');
+        if (clash) {
+          return res.status(422).json({
+            error: `El documento del acudiente (${parentDoc}) pertenece a un estudiante ya registrado: ${clash.first_name} ${clash.last_name} (${clash.document_type} ${parentDoc}).`,
+            field: 'parentDocumentNumber',
+          });
+        }
+      }
+
       const [student] = await db('students')
         .where({ id: req.params.id, school_id: req.schoolId })
         .update(toDbColumns(req.body))
         .returning('*');
-      if (!student) return res.status(404).json({ error: 'Estudiante no encontrado.' });
       res.json({ data: student });
     } catch (err) {
       if (err.code === '23505') {
@@ -274,6 +343,14 @@ router.post('/import-csv',
 
         if (missing.length > 0) {
           errorLog.push({ row: rowNum, reason: `Campos requeridos faltantes: ${missing.join(', ')}` });
+          return;
+        }
+
+        const parentDocNum = row.parentDocumentNumber?.trim() || null;
+        const studentDocNum = row.documentNumber.trim();
+
+        if (parentDocNum && parentDocNum === studentDocNum) {
+          errorLog.push({ row: rowNum, reason: 'El documento del acudiente no puede ser igual al del estudiante.' });
           return;
         }
 

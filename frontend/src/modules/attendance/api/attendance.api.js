@@ -5,9 +5,13 @@ export const attendanceApi = {
   bulkRecord: (data) =>
     apiClient.post('/attendance/bulk', data),
 
-  /** Vista del día: ?classroomId=&date= */
-  getByClassroomAndDate: (classroomId, date) =>
-    apiClient.get('/attendance', { params: { classroomId, date } }),
+  /** Vista del día: ?classroomId=&date=&subjectId= */
+  getByClassroomAndDate: (classroomId, date, subjectId) =>
+    apiClient.get('/attendance', { params: { classroomId, date, ...(subjectId ? { subjectId } : {}) } }),
+
+  /** Materias del docente en un grupo */
+  getSubjectsByClassroom: (classroomId) =>
+    apiClient.get('/attendance/subjects-by-classroom', { params: { classroomId } }),
 
   /** Historial de un estudiante: ?studentId=&periodId= */
   getByStudentAndPeriod: (studentId, periodId) =>

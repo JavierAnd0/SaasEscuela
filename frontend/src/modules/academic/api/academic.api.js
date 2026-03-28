@@ -21,4 +21,14 @@ export const academicApi = {
   createSubject:     (data)       => apiClient.post('/subjects', data),
   updateSubject:     (id, data)   => apiClient.put(`/subjects/${id}`, data),
   deleteSubject:     (id)         => apiClient.delete(`/subjects/${id}`),
+
+  // Años académicos
+  getAcademicYears:  ()           => apiClient.get('/academic-years'),
+
+  // Períodos
+  getPeriods:        (yearId)     => apiClient.get('/periods', { params: yearId ? { yearId } : {} }),
+  createPeriod:      (data)       => apiClient.post('/periods', data),
+  updatePeriod:      (id, data)   => apiClient.put(`/periods/${id}`, data),
+  deletePeriod:      (id)         => apiClient.delete(`/periods/${id}`),
+  togglePeriodClose: (id)         => apiClient.post(`/periods/${id}/close`),
 };

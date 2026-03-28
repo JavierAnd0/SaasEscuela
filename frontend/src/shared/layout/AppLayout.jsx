@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, PenSquare, TrendingUp,
   Sparkles, FileText, Send, Settings, Users, GraduationCap, LogOut,
-  BookOpen, UserCog, BarChart2, Menu,
+  BookOpen, UserCog, BarChart2, Menu, CalendarDays,
 } from 'lucide-react';
 import { useFirebaseAuth } from '../../modules/auth/hooks/useFirebaseAuth';
 import useAuthStore from '../../modules/auth/store/auth.store';
@@ -15,6 +15,7 @@ const ROLE_MENUS = {
     { to: '/app/coordinator/grades', Icon: BarChart2,       label: 'Notas' },
     { to: '/app/students',           Icon: GraduationCap,   label: 'Estudiantes' },
     { to: '/app/academic',           Icon: BookOpen,        label: 'Estructura Académica' },
+    { to: '/app/periods',            Icon: CalendarDays,    label: 'Calendario / Períodos' },
     { to: '/app/assignments',        Icon: UserCog,         label: 'Asignaciones' },
     { to: '/app/admin/users',        Icon: Users,           label: 'Usuarios' },
     { to: '/app/consolidation',      Icon: TrendingUp,      label: 'Consolidación' },

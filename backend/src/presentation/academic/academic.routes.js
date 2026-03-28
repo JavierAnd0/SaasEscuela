@@ -85,18 +85,30 @@ router.get('/academic-years', ...auth, roles('teacher', 'coordinator', 'school_a
  */
 router.get('/periods', ...auth, roles('teacher', 'coordinator', 'school_admin'), async (req, res, next) => {
   try {
-    const { yearId } = req.query;
+    const { yearId, current } = req.query;
 
     let query = db('periods as p')
       .join('academic_years as ay', 'ay.id', 'p.academic_year_id')
       .where('p.school_id', req.schoolId)
-      .select('p.id', 'p.name', 'p.period_number', 'p.start_date', 'p.end_date', 'p.weight_percent', 'p.is_closed', 'p.academic_year_id')
+      .select('p.id', 'p.name', 'p.period_number', 'p.start_date', 'p.end_date',
+              'p.grades_open_from', 'p.grades_open_until',
+              'p.weight_percent', 'p.is_closed', 'p.closed_at', 'p.academic_year_id')
       .orderBy('p.period_number');
 
     if (yearId) {
       query = query.where('p.academic_year_id', yearId);
     } else {
       query = query.where('ay.is_active', true);
+    }
+
+    // ?current=true → solo el período cuya ventana de fechas cubre hoy y no está cerrado.
+    // Si un período no tiene fechas configuradas se excluye (el coordinador debe configurarlas).
+    if (current === 'true' || current === '1') {
+      const today = new Date().toISOString().slice(0, 10);
+      query = query
+        .where('p.is_closed', false)
+        .whereRaw('(p.start_date IS NULL OR p.start_date <= ?)', [today])
+        .whereRaw('(p.end_date IS NULL OR p.end_date >= ?)', [today]);
     }
 
     res.json({ data: await query });
@@ -355,14 +367,27 @@ router.put('/academic-years/:id/activate', ...coordAuth, async (req, res, next) 
 
 // ─── Gestión de Periodos ──────────────────────────────────────────────────────
 
+const dateOpt = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD').optional().nullable();
+
 const PeriodSchema = z.object({
-  name:          z.string().min(1).max(50),
-  periodNumber:  z.number().int().min(1).max(8),
-  startDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  endDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  weightPercent: z.number().min(0).max(100),
-  academicYearId: z.string().uuid(),
-});
+  name:            z.string().min(1).max(50),
+  periodNumber:    z.number().int().min(1).max(8),
+  startDate:       dateOpt,
+  endDate:         dateOpt,
+  gradesOpenFrom:  dateOpt,
+  gradesOpenUntil: dateOpt,
+  weightPercent:   z.number().min(0).max(100),
+  academicYearId:  z.string().uuid(),
+}).refine(
+  d => !d.startDate || !d.endDate || d.startDate <= d.endDate,
+  { message: 'La fecha de fin debe ser posterior al inicio del período.', path: ['endDate'] }
+).refine(
+  d => !d.gradesOpenFrom || !d.gradesOpenUntil || d.gradesOpenFrom <= d.gradesOpenUntil,
+  { message: 'El cierre de notas debe ser posterior a la apertura.', path: ['gradesOpenUntil'] }
+).refine(
+  d => !d.startDate || !d.gradesOpenFrom || d.gradesOpenFrom >= d.startDate,
+  { message: 'La apertura de notas no puede ser antes del inicio del período.', path: ['gradesOpenFrom'] }
+);
 
 /**
  * POST /api/v1/periods
@@ -375,14 +400,16 @@ router.post('/periods', ...coordAuth, validate(PeriodSchema), async (req, res, n
 
     const [period] = await db('periods')
       .insert({
-        school_id:        req.schoolId,
-        academic_year_id: req.body.academicYearId,
-        period_number:    req.body.periodNumber,
-        name:             req.body.name,
-        start_date:       req.body.startDate || null,
-        end_date:         req.body.endDate   || null,
-        weight_percent:   req.body.weightPercent,
-        is_closed:        false,
+        school_id:         req.schoolId,
+        academic_year_id:  req.body.academicYearId,
+        period_number:     req.body.periodNumber,
+        name:              req.body.name,
+        start_date:        req.body.startDate       || null,
+        end_date:          req.body.endDate         || null,
+        grades_open_from:  req.body.gradesOpenFrom  || null,
+        grades_open_until: req.body.gradesOpenUntil || null,
+        weight_percent:    req.body.weightPercent,
+        is_closed:         false,
       })
       .returning('*');
     res.status(201).json({ data: period });
@@ -393,12 +420,20 @@ router.post('/periods', ...coordAuth, validate(PeriodSchema), async (req, res, n
 });
 
 const PeriodUpdateSchema = z.object({
-  name:          z.string().min(1).max(50).optional(),
-  periodNumber:  z.number().int().min(1).max(8).optional(),
-  startDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  endDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  weightPercent: z.number().min(0).max(100).optional(),
-});
+  name:            z.string().min(1).max(50).optional(),
+  periodNumber:    z.number().int().min(1).max(8).optional(),
+  startDate:       dateOpt,
+  endDate:         dateOpt,
+  gradesOpenFrom:  dateOpt,
+  gradesOpenUntil: dateOpt,
+  weightPercent:   z.number().min(0).max(100).optional(),
+}).refine(
+  d => !d.startDate || !d.endDate || d.startDate <= d.endDate,
+  { message: 'La fecha de fin debe ser posterior al inicio del período.', path: ['endDate'] }
+).refine(
+  d => !d.gradesOpenFrom || !d.gradesOpenUntil || d.gradesOpenFrom <= d.gradesOpenUntil,
+  { message: 'El cierre de notas debe ser posterior a la apertura.', path: ['gradesOpenUntil'] }
+);
 
 /**
  * PUT /api/v1/periods/:id
@@ -406,11 +441,13 @@ const PeriodUpdateSchema = z.object({
 router.put('/periods/:id', ...coordAuth, validate(PeriodUpdateSchema), async (req, res, next) => {
   try {
     const updates = {};
-    if (req.body.name          !== undefined) updates.name           = req.body.name;
-    if (req.body.periodNumber  !== undefined) updates.period_number  = req.body.periodNumber;
-    if (req.body.startDate     !== undefined) updates.start_date     = req.body.startDate || null;
-    if (req.body.endDate       !== undefined) updates.end_date       = req.body.endDate   || null;
-    if (req.body.weightPercent !== undefined) updates.weight_percent = req.body.weightPercent;
+    if (req.body.name            !== undefined) updates.name              = req.body.name;
+    if (req.body.periodNumber    !== undefined) updates.period_number     = req.body.periodNumber;
+    if (req.body.startDate       !== undefined) updates.start_date        = req.body.startDate       || null;
+    if (req.body.endDate         !== undefined) updates.end_date          = req.body.endDate         || null;
+    if (req.body.gradesOpenFrom  !== undefined) updates.grades_open_from  = req.body.gradesOpenFrom  || null;
+    if (req.body.gradesOpenUntil !== undefined) updates.grades_open_until = req.body.gradesOpenUntil || null;
+    if (req.body.weightPercent   !== undefined) updates.weight_percent    = req.body.weightPercent;
 
     const [period] = await db('periods')
       .where({ id: req.params.id, school_id: req.schoolId })

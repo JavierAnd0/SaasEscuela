@@ -30,6 +30,7 @@ import PublicReportCardPage from './modules/report-cards/pages/PublicReportCardP
 
 // Estructura académica y asignaciones
 import AcademicSetupPage    from './modules/academic/pages/AcademicSetupPage';
+import PeriodsPage          from './modules/academic/pages/PeriodsPage';
 import AssignmentsPage      from './modules/assignments/pages/AssignmentsPage';
 import CoordinatorGradesPage from './modules/grades/pages/CoordinatorGradesPage';
 
@@ -46,10 +47,11 @@ import SubscriptionRequiredPage from './shared/pages/SubscriptionRequiredPage';
 import SuperadminSchoolsPage from './modules/superadmin/pages/SuperadminSchoolsPage';
 
 // Portal de padres
-import PortalLayout      from './modules/portal/layout/PortalLayout';
-import PortalLoginPage   from './modules/portal/pages/PortalLoginPage';
-import PortalHomePage    from './modules/portal/pages/PortalHomePage';
-import PortalStudentPage from './modules/portal/pages/PortalStudentPage';
+import PortalLayout              from './modules/portal/layout/PortalLayout';
+import PortalLoginPage           from './modules/portal/pages/PortalLoginPage';
+import PortalForgotPasswordPage  from './modules/portal/pages/PortalForgotPasswordPage';
+import PortalHomePage            from './modules/portal/pages/PortalHomePage';
+import PortalStudentPage         from './modules/portal/pages/PortalStudentPage';
 
 // Placeholder para módulos futuros
 function ComingSoon({ name }) {
@@ -114,6 +116,7 @@ export default function App() {
 
           {/* Estructura académica */}
           <Route path="academic"      element={<AcademicSetupPage />} />
+          <Route path="periods"       element={<PeriodsPage />} />
           <Route path="assignments"   element={<AssignmentsPage />} />
           <Route path="coordinator/grades" element={<CoordinatorGradesPage />} />
 
@@ -139,7 +142,8 @@ export default function App() {
         </Route>
 
         {/* ─── Portal de Padres ───────────────────────── */}
-        <Route path="/portal/login" element={<PortalLoginPage />} />
+        <Route path="/portal/login"            element={<PortalLoginPage />} />
+        <Route path="/portal/forgot-password"  element={<PortalForgotPasswordPage />} />
         <Route
           path="/portal"
           element={

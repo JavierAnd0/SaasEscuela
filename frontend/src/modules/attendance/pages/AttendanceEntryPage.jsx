@@ -1,58 +1,76 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, CalendarDays, AlertTriangle } from 'lucide-react';
 import AttendanceGrid from '../components/AttendanceGrid';
 import { attendanceApi } from '../api/attendance.api';
 import apiClient from '../../../shared/api/client';
-import SetupRequiredBanner from '../../../shared/components/SetupRequiredBanner';
+
 export default function AttendanceEntryPage() {
-  // Filtros
-  const [classrooms,   setClassrooms]   = useState([]);
-  const [periods,      setPeriods]       = useState([]);
-  const [classroomId,  setClassroomId]   = useState('');
-  const [periodId,     setPeriodId]      = useState('');
-  const [recordDate,   setRecordDate]    = useState(() => new Date().toISOString().slice(0, 10));
+  // Contexto fijo (no editable por el docente)
+  const [currentPeriod, setCurrentPeriod] = useState(null);  // período vigente
+  const [recordDate] = useState(() => new Date().toISOString().slice(0, 10));
 
-  // Datos
-  const [students,     setStudents]      = useState([]);
-  const [existingRecs, setExistingRecs]  = useState({});
-  const [loadingInit,  setLoadingInit]   = useState(true);
-  const [loadingData,  setLoadingData]   = useState(false);
-  const [saving,       setSaving]        = useState(false);
-  const [toast,        setToast]         = useState(null);
+  // Selectores del docente
+  const [classrooms,  setClassrooms]  = useState([]);
+  const [subjects,    setSubjects]    = useState([]);
+  const [classroomId, setClassroomId] = useState('');
+  const [subjectId,   setSubjectId]   = useState('');
 
-  // Carga grupos y períodos al montar
+  // Datos de la grilla
+  const [students,     setStudents]     = useState([]);
+  const [existingRecs, setExistingRecs] = useState({});
+  const [loadingInit,  setLoadingInit]  = useState(true);
+  const [loadingData,  setLoadingData]  = useState(false);
+  const [saving,       setSaving]       = useState(false);
+  const [toast,        setToast]        = useState(null);
+
+  // ── Carga inicial: grupos + período vigente ──────────────────────────────────
   useEffect(() => {
     Promise.all([
       apiClient.get('/classrooms'),
-      apiClient.get('/periods'),
+      apiClient.get('/periods', { params: { current: 'true' } }),
     ])
       .then(([clRes, perRes]) => {
-        setClassrooms(clRes.data?.data  || []);
-        setPeriods(perRes.data?.data    || []);
+        setClassrooms(clRes.data?.data || []);
+        const periods = perRes.data?.data || [];
+        // Solo debe existir uno; si hay varios (fechas solapadas) tomamos el primero
+        setCurrentPeriod(periods[0] ?? null);
       })
       .catch(() => {})
       .finally(() => setLoadingInit(false));
   }, []);
 
-  // Carga estudiantes y asistencia existente al cambiar filtros
+  // ── Materias del docente para el grupo seleccionado ──────────────────────────
   useEffect(() => {
-    if (!classroomId || !periodId || !recordDate) return;
+    if (!classroomId) { setSubjects([]); setSubjectId(''); return; }
+    attendanceApi.getSubjectsByClassroom(classroomId)
+      .then(r => {
+        const subs = r.data?.data || [];
+        setSubjects(subs);
+        setSubjectId(subs.length === 1 ? subs[0].id : '');
+      })
+      .catch(() => { setSubjects([]); setSubjectId(''); });
+  }, [classroomId]);
 
+  // ── Estudiantes y registros existentes ───────────────────────────────────────
+  useEffect(() => {
+    if (!classroomId || !subjectId || !currentPeriod) {
+      setStudents([]); setExistingRecs({});
+      return;
+    }
     setLoadingData(true);
     Promise.all([
       apiClient.get('/students', { params: { classroomId } }),
-      attendanceApi.getByClassroomAndDate(classroomId, recordDate),
+      attendanceApi.getByClassroomAndDate(classroomId, recordDate, subjectId),
     ])
       .then(([studRes, attRes]) => {
         setStudents(studRes.data?.data || []);
-        // Convierte array de registros a mapa { studentId: status }
         const map = {};
         (attRes.data?.data || []).forEach(r => { map[r.student_id] = r.status; });
         setExistingRecs(map);
       })
       .catch(() => showToast('Error al cargar datos.', 'error'))
       .finally(() => setLoadingData(false));
-  }, [classroomId, periodId, recordDate]);
+  }, [classroomId, subjectId, currentPeriod, recordDate]);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -62,7 +80,13 @@ export default function AttendanceEntryPage() {
   const handleSave = async (records) => {
     setSaving(true);
     try {
-      await attendanceApi.bulkRecord({ classroomId, periodId, recordDate, records });
+      await attendanceApi.bulkRecord({
+        classroomId,
+        periodId: currentPeriod.id,
+        subjectId,
+        recordDate,
+        records,
+      });
       showToast(`Asistencia guardada para ${records.length} estudiantes.`);
     } catch (err) {
       showToast(err.response?.data?.error || 'Error al guardar.', 'error');
@@ -70,6 +94,8 @@ export default function AttendanceEntryPage() {
       setSaving(false);
     }
   };
+
+  // ── Estados de carga ─────────────────────────────────────────────────────────
 
   if (loadingInit) {
     return (
@@ -83,7 +109,8 @@ export default function AttendanceEntryPage() {
     );
   }
 
-  if (periods.length === 0) {
+  // Sin período vigente — el coordinador debe configurar fechas
+  if (!currentPeriod) {
     return (
       <div className="max-w-4xl">
         <div className="mb-6">
@@ -92,13 +119,27 @@ export default function AttendanceEntryPage() {
             Registro de Asistencia
           </h1>
         </div>
-        <SetupRequiredBanner />
+        <div className="card p-8 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle size={20} className="text-amber-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">No hay período vigente para hoy</p>
+            <p className="text-sm text-gray-500 mt-1">
+              El coordinador debe configurar las fechas del período académico actual
+              en <strong>Calendario / Períodos</strong> para habilitar el registro de asistencia.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // ── Render principal ─────────────────────────────────────────────────────────
+
   return (
     <div className="max-w-4xl">
+
       {/* Encabezado */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -119,24 +160,30 @@ export default function AttendanceEntryPage() {
         </div>
       )}
 
-      {/* Filtros */}
+      {/* Contexto fijo — período y fecha (no editables) */}
+      <div className="flex flex-wrap items-center gap-3 mb-4 px-1">
+        <div className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-full border"
+             style={{ borderColor: 'var(--color-border)', backgroundColor: 'rgba(102,108,255,0.06)' }}>
+          <span className="font-semibold" style={{ color: 'var(--color-primary)' }}>
+            {currentPeriod.name}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-sm text-gray-500">
+          <CalendarDays size={14} />
+          {new Date(recordDate + 'T12:00:00').toLocaleDateString('es-CO', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          })}
+        </div>
+      </div>
+
+      {/* Selectores: solo Grupo y Materia */}
       <div className="card p-4 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Fecha</label>
-            <input
-              type="date"
-              value={recordDate}
-              onChange={e => setRecordDate(e.target.value)}
-              className="w-full text-sm rounded-lg border border-gray-300 px-3 py-2
-                         focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Grupo</label>
             <select
               value={classroomId}
-              onChange={e => setClassroomId(e.target.value)}
+              onChange={e => { setClassroomId(e.target.value); setSubjectId(''); }}
               className="w-full text-sm rounded-lg border border-gray-300 px-3 py-2
                          focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
@@ -147,23 +194,31 @@ export default function AttendanceEntryPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Período</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Materia</label>
             <select
-              value={periodId}
-              onChange={e => setPeriodId(e.target.value)}
+              value={subjectId}
+              onChange={e => setSubjectId(e.target.value)}
+              disabled={!classroomId || subjects.length === 0}
               className="w-full text-sm rounded-lg border border-gray-300 px-3 py-2
-                         focus:outline-none focus:ring-2 focus:ring-primary-500"
+                         focus:outline-none focus:ring-2 focus:ring-primary-500
+                         disabled:bg-gray-50 disabled:text-gray-400"
             >
-              <option value="">Seleccione un período</option>
-              {periods.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+              <option value="">
+                {!classroomId
+                  ? 'Seleccione grupo primero'
+                  : subjects.length === 0
+                    ? 'Sin materias asignadas'
+                    : 'Seleccione una materia'}
+              </option>
+              {subjects.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
           </div>
         </div>
       </div>
 
-      {/* Grid de asistencia */}
+      {/* Cargando estudiantes */}
       {loadingData && (
         <div className="flex items-center gap-2 text-gray-500 text-sm p-8 justify-center">
           <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
@@ -174,13 +229,21 @@ export default function AttendanceEntryPage() {
         </div>
       )}
 
+      {/* Grilla de asistencia */}
       {!loadingData && students.length > 0 && (
         <div className="card p-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900">
-              {classrooms.find(c => c.id === classroomId)?.name} —{' '}
-              {new Date(recordDate + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </h2>
+            <div>
+              <h2 className="font-semibold text-gray-900">
+                {classrooms.find(c => c.id === classroomId)?.name} —{' '}
+                {subjects.find(s => s.id === subjectId)?.name}
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {new Date(recordDate + 'T12:00:00').toLocaleDateString('es-CO', {
+                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                })}
+              </p>
+            </div>
             <span className="text-xs text-gray-400">{students.length} estudiantes</span>
           </div>
           <AttendanceGrid
@@ -192,15 +255,15 @@ export default function AttendanceEntryPage() {
         </div>
       )}
 
-      {!loadingData && classroomId && periodId && students.length === 0 && (
+      {!loadingData && classroomId && subjectId && students.length === 0 && (
         <div className="card p-8 text-center text-gray-400">
           No hay estudiantes matriculados en este grupo.
         </div>
       )}
 
-      {!classroomId && (
+      {(!classroomId || !subjectId) && !loadingData && (
         <div className="card p-8 text-center text-gray-400">
-          Seleccione un grupo y período para comenzar.
+          {!classroomId ? 'Seleccione un grupo para comenzar.' : 'Seleccione una materia.'}
         </div>
       )}
     </div>

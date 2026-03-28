@@ -27,6 +27,7 @@ const SingleAttendanceSchema = z.object({
 const BulkAttendanceSchema = z.object({
   classroomId: z.string().uuid(),
   periodId:    z.string().uuid(),
+  subjectId:   z.string().uuid('subjectId debe ser un UUID válido').optional(),
   recordDate:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'recordDate debe ser YYYY-MM-DD'),
   records: z.array(z.object({
     studentId:     z.string().uuid(),

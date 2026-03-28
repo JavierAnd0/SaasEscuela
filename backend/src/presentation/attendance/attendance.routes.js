@@ -10,6 +10,7 @@ const {
 } = require('./attendance.schema');
 const ctrl = require('./attendance.controller');
 const { requireOpenPeriod } = require('../middlewares/requireOpenPeriod.middleware');
+const db = require('../../infrastructure/database/knex/config');
 
 /**
  * POST /api/v1/attendance/bulk
@@ -69,6 +70,40 @@ router.get(
   ...auth,
   roles('coordinator', 'school_admin'),
   ctrl.getAlerts
+);
+
+/**
+ * GET /api/v1/attendance/subjects-by-classroom
+ * Materias que el docente autenticado dicta en un grupo específico.
+ * Usado para poblar el selector de materia en el formulario de asistencia.
+ * ?classroomId=
+ */
+router.get(
+  '/subjects-by-classroom',
+  ...auth,
+  roles('teacher', 'coordinator', 'school_admin'),
+  async (req, res, next) => {
+    try {
+      const { classroomId } = req.query;
+      if (!classroomId) {
+        return res.status(400).json({ error: 'classroomId es requerido.' });
+      }
+
+      let query = db('teacher_assignments as ta')
+        .join('subjects as s', 's.id', 'ta.subject_id')
+        .where({ 'ta.school_id': req.schoolId, 'ta.classroom_id': classroomId })
+        .select('s.id', 's.name', 's.code', 's.area')
+        .orderBy('s.name');
+
+      // Docentes ven solo sus materias; coordinadores/admins ven todas las del grupo
+      if (req.user.role === 'teacher') {
+        query = query.where('ta.teacher_id', req.user.dbId);
+      }
+
+      const subjects = await query;
+      res.json({ data: subjects });
+    } catch (err) { next(err); }
+  }
 );
 
 /**

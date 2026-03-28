@@ -25,7 +25,7 @@ class RecordDailyAttendanceUseCase {
    * @param {Array<{ studentId, status, justification? }>} params.records
    * @returns {Promise<object[]>}
    */
-  async execute({ schoolId, classroomId, periodId, recordDate, recordedBy, records }) {
+  async execute({ schoolId, classroomId, periodId, subjectId, recordDate, recordedBy, records }) {
     if (!records || records.length === 0) {
       throw new ValidationError('Se requiere al menos un registro de asistencia.');
     }
@@ -37,6 +37,7 @@ class RecordDailyAttendanceUseCase {
         studentId:   r.studentId,
         classroomId,
         periodId,
+        subjectId:    subjectId ?? null,
         recordDate,
         status:       r.status,
         justification: r.justification || null,

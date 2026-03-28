@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Zap, AlertTriangle, Check, TrendingUp } from 'lucide-react';
+import { Zap, AlertTriangle, Check, TrendingUp, FileDown } from 'lucide-react';
 import apiClient from '../../../shared/api/client';
 import { consolidationApi } from '../api/consolidation.api';
 import GradeLevelBadge, { getGradeLevel } from '../../grades/components/GradeLevelBadge';
+import { useToast, Toast } from '../../../shared/hooks/useToast';
+import { downloadExcel } from '../../../shared/utils/exportBlob';
 
 function Spinner() {
   return (
@@ -31,12 +33,8 @@ export default function ConsolidationPage() {
   const [summary,      setSummary]      = useState([]);
   const [loadingData,  setLoadingData]  = useState(false);
   const [running,      setRunning]      = useState(false);
-  const [toast,        setToast]        = useState(null);
-
-  const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+  const [exporting,    setExporting]    = useState(false);
+  const [toast, showToast, dismissToast] = useToast();
 
   // Load classrooms and periods on mount
   useEffect(() => {
@@ -56,6 +54,15 @@ export default function ConsolidationPage() {
       .catch(() => setSummary([]))
       .finally(() => setLoadingData(false));
   }, [classroomId, periodId]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await downloadExcel('/export/consolidation', { classroomId, periodId }, `consolidado_${Date.now()}.xlsx`);
+    } catch {
+      showToast('Error al exportar el Excel.', 'error');
+    } finally { setExporting(false); }
+  };
 
   const handleRunConsolidation = async () => {
     if (!classroomId || !periodId) {
@@ -100,26 +107,28 @@ export default function ConsolidationPage() {
             Calcule los promedios del período y consulte el estado académico del grupo
           </p>
         </div>
-        <button
-          onClick={handleRunConsolidation}
-          disabled={!classroomId || !periodId || running}
-          className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {running ? <Spinner /> : <Zap size={16} />}
-          {running ? 'Calculando…' : 'Calcular Consolidación'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={!classroomId || !periodId || summary.length === 0 || exporting}
+            className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Exportar a Excel"
+          >
+            <FileDown size={14} />
+            {exporting ? 'Exportando…' : 'Excel'}
+          </button>
+          <button
+            onClick={handleRunConsolidation}
+            disabled={!classroomId || !periodId || running}
+            className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {running ? <Spinner /> : <Zap size={16} />}
+            {running ? 'Calculando…' : 'Calcular Consolidación'}
+          </button>
+        </div>
       </div>
 
-      {/* Toast */}
-      {toast && (
-        <div className={`p-3 rounded-lg text-sm border ${
-          toast.type === 'error'
-            ? 'bg-red-50 border-red-200 text-red-700'
-            : 'bg-green-50 border-green-200 text-green-700'
-        }`}>
-          {toast.msg}
-        </div>
-      )}
+      <Toast toast={toast} onDismiss={dismissToast} />
 
       {/* Filter bar */}
       <div className="card p-4">

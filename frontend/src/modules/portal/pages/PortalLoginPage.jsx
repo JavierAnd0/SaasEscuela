@@ -111,7 +111,7 @@ export default function PortalLoginPage() {
 
           <div className="mt-4 text-center">
             <Link
-              to="/forgot-password"
+              to="/portal/forgot-password"
               className="text-sm text-emerald-700 hover:text-emerald-900 hover:underline"
             >
               ¿Olvidó su contraseña?

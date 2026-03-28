@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, Lock, Clock, AlertTriangle } from 'lucide-react';
 import apiClient       from '../../../shared/api/client';
 import { gradesApi }   from '../api/grades.api';
 import AssignmentTabs  from '../components/AssignmentTabs';
@@ -31,6 +31,20 @@ export default function GradeEntryPage() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   }, []);
+
+  // Estado de la ventana de notas para el período seleccionado
+  const gradeWindowInfo = useCallback(() => {
+    const p = periods.find(x => x.id === periodId);
+    if (!p) return null;
+    if (p.is_closed) return { type: 'closed', msg: `El período "${p.name}" está cerrado manualmente.` };
+    const today = new Date().toISOString().slice(0, 10);
+    const fmt = d => new Date(d + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (p.grades_open_from && today < p.grades_open_from)
+      return { type: 'pending', msg: `La ventana de notas abre el ${fmt(p.grades_open_from)}.` };
+    if (p.grades_open_until && today > p.grades_open_until)
+      return { type: 'expired', msg: `La ventana de notas cerró el ${fmt(p.grades_open_until)}.` };
+    return null;
+  }, [periods, periodId]);
 
   // Cargar asignaciones y períodos al montar
   useEffect(() => {
@@ -207,6 +221,23 @@ export default function GradeEntryPage() {
           {toast.msg}
         </div>
       )}
+
+      {/* Banner de ventana de notas */}
+      {(() => {
+        const info = gradeWindowInfo();
+        if (!info) return null;
+        const styles = {
+          closed:  { bg: 'bg-red-50 border-red-200 text-red-700',    Icon: Lock },
+          pending: { bg: 'bg-blue-50 border-blue-200 text-blue-700',  Icon: Clock },
+          expired: { bg: 'bg-amber-50 border-amber-200 text-amber-700', Icon: AlertTriangle },
+        }[info.type];
+        return (
+          <div className={`flex items-center gap-3 p-3 rounded-lg border text-sm ${styles.bg}`}>
+            <styles.Icon size={16} className="flex-shrink-0" />
+            <span>{info.msg}</span>
+          </div>
+        );
+      })()}
 
       {/* Sin asignaciones */}
       {assignments.length === 0 && (

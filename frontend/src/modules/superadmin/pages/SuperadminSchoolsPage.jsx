@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   GraduationCap, Plus, Search, Users, BookOpen,
   ChevronDown, ChevronUp, CheckCircle2, AlertCircle,
-  Loader2, Building2, ShieldCheck, Clock, Ban,
-  ExternalLink, Save,
+  Loader2, Building2, ShieldCheck, Clock, Ban, Save,
 } from 'lucide-react';
 import { superadminApi } from '../api/superadmin.api';
+import Modal from '../../../shared/components/Modal';
+import { useToast, Toast } from '../../../shared/hooks/useToast';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -31,15 +32,6 @@ const EMPTY_ADMIN_FORM = {
 
 function Spinner({ size = 16 }) {
   return <Loader2 size={size} className="animate-spin text-indigo-500" />;
-}
-
-function useToast() {
-  const [toast, setToast] = useState(null);
-  const show = useCallback((msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 5000);
-  }, []);
-  return [toast, show];
 }
 
 function StatusBadge({ status }) {
@@ -75,7 +67,7 @@ function KpiCard({ label, value, sub, Icon, color }) {
 
 // ─── Modal: Crear colegio + admin ─────────────────────────────────────────────
 
-function CreateSchoolModal({ onClose, onCreated, showToast }) {
+function CreateSchoolModal({ isOpen, onClose, onCreated, showToast }) {
   const [schoolForm, setSchoolForm] = useState(EMPTY_SCHOOL_FORM);
   const [adminForm,  setAdminForm]  = useState(EMPTY_ADMIN_FORM);
   const [step,    setStep]    = useState(1); // 1: datos colegio, 2: cuenta admin
@@ -162,40 +154,32 @@ function CreateSchoolModal({ onClose, onCreated, showToast }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-
-        {/* Header */}
-        <div className="px-7 pt-7 pb-5 border-b border-gray-100">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Nuevo Colegio</h2>
-              <p className="text-sm text-gray-500 mt-1">Crea el tenant y la cuenta del rector/administrador.</p>
-            </div>
-            <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-2xl leading-none mt-0.5">&times;</button>
-          </div>
-
-          {/* Paso a paso */}
-          <div className="flex items-center gap-3 mt-5">
-            {[{ n: 1, label: 'Datos del colegio' }, { n: 2, label: 'Cuenta administrador' }].map(({ n, label }) => (
-              <div key={n} className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-                step === n ? 'text-indigo-600' : step > n ? 'text-emerald-600' : 'text-gray-400'
+    <Modal isOpen={isOpen} onClose={onClose} title="Nuevo Colegio" size="lg" noPadding>
+      {/* Step indicator */}
+      <div className="px-7 pt-5 pb-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <p className="text-sm mb-4" style={{ color: 'var(--color-muted)' }}>
+          Crea el tenant y la cuenta del rector/administrador.
+        </p>
+        <div className="flex items-center gap-3">
+          {[{ n: 1, label: 'Datos del colegio' }, { n: 2, label: 'Cuenta administrador' }].map(({ n, label }) => (
+            <div key={n} className={`flex items-center gap-2 text-sm font-medium transition-colors ${
+              step === n ? 'text-indigo-600' : step > n ? 'text-emerald-600' : 'text-gray-400'
+            }`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
+                step === n ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
+                : step > n ? 'border-emerald-500 text-white bg-emerald-500'
+                : 'border-gray-200 text-gray-400'
               }`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
-                  step === n ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-                  : step > n ? 'border-emerald-500 text-white bg-emerald-500'
-                  : 'border-gray-200 text-gray-400'
-                }`}>
-                  {step > n ? '✓' : n}
-                </div>
-                {label}
-                {n < 2 && <span className="text-gray-200 ml-2">›</span>}
+                {step > n ? '✓' : n}
               </div>
-            ))}
-          </div>
+              {label}
+              {n < 2 && <span className="text-gray-200 ml-2">›</span>}
+            </div>
+          ))}
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit}>
           {/* Paso 1: Datos del colegio */}
           {step === 1 && (
             <div className="px-7 py-6 space-y-5">
@@ -304,9 +288,8 @@ function CreateSchoolModal({ onClose, onCreated, showToast }) {
               </div>
             </div>
           )}
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -481,7 +464,7 @@ export default function SuperadminSchoolsPage() {
   const [loading,   setLoading]   = useState(true);
   const [search,    setSearch]    = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [toast, showToast] = useToast();
+  const [toast, showToast, dismissToast] = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -526,10 +509,10 @@ export default function SuperadminSchoolsPage() {
     <div className="max-w-6xl space-y-6">
 
       {/* Encabezado */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Panel Superadmin</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Gestión de todos los colegios del SaaS</p>
+          <h1 className="page-title">Panel Superadmin</h1>
+          <p className="page-subtitle">Gestión de todos los colegios del SaaS</p>
         </div>
         <button onClick={() => setShowModal(true)} className="btn-primary flex-shrink-0">
           <Plus size={15} /> Nuevo Colegio
@@ -537,16 +520,7 @@ export default function SuperadminSchoolsPage() {
       </div>
 
       {/* Toast */}
-      {toast && (
-        <div className={`p-3 rounded-lg text-sm border flex items-center gap-2 ${
-          toast.type === 'error'
-            ? 'bg-red-50 border-red-200 text-red-700'
-            : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-        }`}>
-          {toast.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
-          {toast.msg}
-        </div>
-      )}
+      <Toast toast={toast} onDismiss={dismissToast} />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -556,31 +530,40 @@ export default function SuperadminSchoolsPage() {
         <KpiCard label="Suspendidos"       value={suspended} Icon={AlertCircle}  color="red"     />
       </div>
 
-      {/* Buscador */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por nombre, slug, ciudad o NIT…"
-          className="input pl-10"
-        />
-      </div>
-
       {/* Tabla */}
       <div className="card overflow-hidden">
+
+        {/* Header bar: search + counter */}
+        <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+          <div className="relative flex-1" style={{ maxWidth: '360px' }}>
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-muted)' }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por nombre, slug, ciudad o NIT…"
+              className="input pl-9 text-sm w-full"
+              style={{ height: '36px' }}
+            />
+          </div>
+          <div className="flex-1" />
+          <span className="text-xs" style={{ color: 'var(--color-muted)' }}>
+            {filtered.length} colegio{filtered.length !== 1 ? 's' : ''}
+            {search && ` · ${total} en total`}
+          </span>
+        </div>
+
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-gray-400 text-sm">
+          <div className="flex items-center justify-center gap-2 py-16 text-sm" style={{ color: 'var(--color-muted)' }}>
             <Spinner size={20} /> Cargando colegios…
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
-            <GraduationCap size={40} className="mx-auto mb-3 text-gray-200" />
-            <p className="font-medium text-gray-600">
+            <GraduationCap size={40} className="mx-auto mb-3" style={{ color: '#d1d5db' }} />
+            <p className="font-medium" style={{ color: 'var(--color-base)' }}>
               {search ? 'Sin resultados para esa búsqueda' : 'No hay colegios registrados'}
             </p>
             {!search && (
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-sm mt-1" style={{ color: 'var(--color-muted)' }}>
                 Haz clic en "Nuevo Colegio" para registrar el primero.
               </p>
             )}
@@ -589,16 +572,16 @@ export default function SuperadminSchoolsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Colegio</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Ubicación</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Suscripción</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Usuarios / Alumnos</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden xl:table-cell">Creado</th>
+                <tr style={{ backgroundColor: 'var(--color-body-bg)', borderBottom: '1px solid var(--color-border)' }}>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Colegio</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide hidden lg:table-cell" style={{ color: 'var(--color-muted)' }}>Ubicación</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Suscripción</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide hidden md:table-cell" style={{ color: 'var(--color-muted)' }}>Usuarios / Alumnos</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide hidden xl:table-cell" style={{ color: 'var(--color-muted)' }}>Creado</th>
                   <th className="px-4 py-3 w-8" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody>
                 {filtered.map(school => (
                   <SchoolRow
                     key={school.id}
@@ -609,22 +592,17 @@ export default function SuperadminSchoolsPage() {
                 ))}
               </tbody>
             </table>
-            <div className="px-5 py-2.5 border-t border-gray-50 bg-gray-50/50 text-xs text-gray-400">
-              {filtered.length} colegio{filtered.length !== 1 ? 's' : ''} mostrado{filtered.length !== 1 ? 's' : ''}
-              {search && ` · ${total} en total`}
-            </div>
           </div>
         )}
       </div>
 
       {/* Modal crear colegio */}
-      {showModal && (
-        <CreateSchoolModal
-          onClose={() => setShowModal(false)}
-          onCreated={handleCreated}
-          showToast={showToast}
-        />
-      )}
+      <CreateSchoolModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onCreated={handleCreated}
+        showToast={showToast}
+      />
     </div>
   );
 }

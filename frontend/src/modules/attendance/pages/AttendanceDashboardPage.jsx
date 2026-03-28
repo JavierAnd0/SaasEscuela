@@ -1,17 +1,29 @@
 import { useState, useEffect } from 'react';
+import { FileDown } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line,
 } from 'recharts';
 import { attendanceApi } from '../api/attendance.api';
 import apiClient from '../../../shared/api/client';
+import { downloadExcel } from '../../../shared/utils/exportBlob';
 
 export default function AttendanceDashboardPage() {
-  const [periods,    setPeriods]    = useState([]);
-  const [periodId,   setPeriodId]   = useState('');
-  const [dashboard,  setDashboard]  = useState(null);
-  const [alerts,     setAlerts]     = useState([]);
-  const [loading,    setLoading]    = useState(false);
+  const [periods,      setPeriods]      = useState([]);
+  const [periodId,     setPeriodId]     = useState('');
+  const [dashboard,    setDashboard]    = useState(null);
+  const [alerts,       setAlerts]       = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [exportingId,  setExportingId]  = useState(null);  // classroomId being exported
+
+  const handleExportClassroom = async (classroomId) => {
+    setExportingId(classroomId);
+    try {
+      await downloadExcel('/export/attendance', { classroomId, periodId }, `asistencia_${Date.now()}.xlsx`);
+    } catch {
+      // silent — no toast setup in this page; browser will show nothing
+    } finally { setExportingId(null); }
+  };
 
   useEffect(() => {
     apiClient.get('/periods').then(r => {
@@ -78,7 +90,18 @@ export default function AttendanceDashboardPage() {
               <div key={c.classroom_id} className="card p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-gray-900">{c.classroom_name || c.name}</h3>
-                  <span className="text-xs text-gray-400">{c.grade_level_name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{c.grade_level_name}</span>
+                    <button
+                      onClick={() => handleExportClassroom(c.classroom_id)}
+                      disabled={exportingId === c.classroom_id}
+                      className="btn-action-primary"
+                      title="Exportar asistencia a Excel"
+                    >
+                      <FileDown size={12} />
+                      {exportingId === c.classroom_id ? '…' : 'Excel'}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">

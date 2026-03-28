@@ -10,58 +10,77 @@ const { AttendanceRepository } = require('../../../domain/attendance/AttendanceR
  */
 class AttendanceKnexRepository extends AttendanceRepository {
   async save(attendance) {
-    const [record] = await db('attendance_records')
+    return this._upsertOne(attendance);
+  }
+
+  async saveMany(attendances) {
+    if (!attendances.length) return [];
+    // Upsert explícito: evita problemas de ON CONFLICT con subject_id nullable
+    const results = await Promise.all(attendances.map(a => this._upsertOne(a)));
+    return results;
+  }
+
+  /**
+   * Upsert de un registro individual.
+   * Busca por (student_id, record_date, subject_id) y actualiza o inserta.
+   */
+  async _upsertOne(attendance) {
+    const lookup = {
+      student_id:  attendance.studentId,
+      record_date: attendance.recordDate,
+    };
+    if (attendance.subjectId) {
+      lookup.subject_id = attendance.subjectId;
+    } else {
+      // registros legado sin materia
+      lookup.subject_id = null;
+    }
+
+    const existing = await db('attendance_records').where(lookup).first();
+
+    if (existing) {
+      const [updated] = await db('attendance_records')
+        .where({ id: existing.id })
+        .update({
+          status:        attendance.status,
+          justification: attendance.justification ?? null,
+          updated_at:    db.fn.now(),
+        })
+        .returning('*');
+      return updated;
+    }
+
+    const [inserted] = await db('attendance_records')
       .insert({
         school_id:    attendance.schoolId,
         student_id:   attendance.studentId,
         classroom_id: attendance.classroomId,
         period_id:    attendance.periodId,
+        subject_id:   attendance.subjectId ?? null,
         record_date:  attendance.recordDate,
         status:       attendance.status,
-        justification: attendance.justification,
+        justification: attendance.justification ?? null,
         recorded_by:  attendance.recordedBy,
       })
-      .onConflict(['student_id', 'record_date'])
-      .merge()   // upsert: si ya existe ese día, actualiza
-      .returning('*');
-    return record;
-  }
-
-  async saveMany(attendances) {
-    if (!attendances.length) return [];
-    const rows = attendances.map(a => ({
-      school_id:    a.schoolId,
-      student_id:   a.studentId,
-      classroom_id: a.classroomId,
-      period_id:    a.periodId,
-      record_date:  a.recordDate,
-      status:       a.status,
-      justification: a.justification,
-      recorded_by:  a.recordedBy,
-    }));
-
-    const inserted = await db('attendance_records')
-      .insert(rows)
-      .onConflict(['student_id', 'record_date'])
-      .merge()
       .returning('*');
     return inserted;
   }
 
-  async findByClassroomAndDate({ schoolId, classroomId, recordDate }) {
-    return db('attendance_records as ar')
+  async findByClassroomAndDate({ schoolId, classroomId, recordDate, subjectId }) {
+    let query = db('attendance_records as ar')
       .join('students as s', 's.id', 'ar.student_id')
       .where({
         'ar.school_id':    schoolId,
         'ar.classroom_id': classroomId,
         'ar.record_date':  recordDate,
-      })
-      .select(
-        'ar.*',
-        's.first_name',
-        's.last_name',
-        's.document_number'
-      )
+      });
+
+    if (subjectId) {
+      query = query.where('ar.subject_id', subjectId);
+    }
+
+    return query
+      .select('ar.*', 's.first_name', 's.last_name', 's.document_number')
       .orderBy('s.last_name', 'asc');
   }
 
