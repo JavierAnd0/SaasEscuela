@@ -97,6 +97,16 @@ class FirebaseAuthAdapter {
   async setDisabled(uid, disabled) {
     await admin.auth().updateUser(uid, { disabled });
   }
+
+  /**
+   * Obtiene un usuario de Firebase por email.
+   * Útil para sincronizar cuando el email ya existe en Firebase pero no en la DB.
+   * @param {string} email
+   * @returns {Promise<admin.auth.UserRecord>}
+   */
+  async getUserByEmail(email) {
+    return admin.auth().getUserByEmail(email);
+  }
 }
 
 module.exports = { FirebaseAuthAdapter };

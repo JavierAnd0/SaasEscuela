@@ -2,6 +2,21 @@
 
 require('dotenv').config();
 
+// ─── Sentry: inicializar ANTES de cualquier otra importación ─────────────────
+// Solo activo cuando SENTRY_DSN está configurado (no rompe en desarrollo local)
+const Sentry = require('@sentry/node');
+Sentry.init({
+  dsn:              process.env.SENTRY_DSN,
+  environment:      process.env.NODE_ENV || 'development',
+  enabled:          !!process.env.SENTRY_DSN,
+  // Muestra el 20 % de las transacciones en producción; 100 % en desarrollo
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
+  // Contexto base para todos los eventos: ayuda a filtrar por servicio en el dashboard
+  initialScope: {
+    tags: { service: 'saascolegio-backend' },
+  },
+});
+
 const path    = require('path');
 const express = require('express');
 const { getHelmet, getCors, getGeneralLimiter, getAILimiter, getAuthLimiter } = require('./presentation/middlewares/security.middleware');
@@ -55,9 +70,9 @@ app.use('/api/v1/comments',      commentsRouter);
 app.use('/api/v1/report-cards',  reportCardsRouter);
 app.use('/api/v1/delivery',      deliveryRouter);
 app.use('/api/v1/portal',        portalRouter);
-// Static file serving for generated PDFs — requiere token válido para cada archivo.
+
+// Static file serving para PDFs en desarrollo local
 // En producción los PDFs deben servirse desde Cloudflare R2 con URLs firmadas.
-// Este middleware es solo para desarrollo local; no exponer en producción sin auth.
 if (process.env.NODE_ENV !== 'production') {
   app.use('/storage', express.static(path.join(__dirname, '..', 'storage')));
 }
@@ -71,6 +86,9 @@ app.get('/health', (req, res) => {
 app.use((_req, res) => {
   res.status(404).json({ error: 'Recurso no encontrado.' });
 });
+
+// ─── Sentry error handler (debe ir ANTES del error handler propio) ────────────
+Sentry.setupExpressErrorHandler(app);
 
 // ─── Error handler central ───────────────────────────────────────────────────
 app.use(errorHandler);
