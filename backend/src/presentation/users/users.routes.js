@@ -1,16 +1,14 @@
 'use strict';
 
 const router = require('express').Router();
-const { firebaseAuthMiddleware } = require('../middlewares/firebaseAuth.middleware');
-const { tenantMiddleware }       = require('../middlewares/tenant.middleware');
-const { roles }                  = require('../middlewares/roles.middleware');
-const { validate }               = require('../middlewares/validate.middleware');
-const { FirebaseAuthAdapter }    = require('../../infrastructure/firebase/FirebaseAuthAdapter');
-const db                         = require('../../infrastructure/database/knex/config');
-const { z }                      = require('zod');
+const { auth }  = require('../middlewares/authMiddlewares');
+const { roles } = require('../middlewares/roles.middleware');
+const { validate }            = require('../middlewares/validate.middleware');
+const { FirebaseAuthAdapter } = require('../../infrastructure/firebase/FirebaseAuthAdapter');
+const db                      = require('../../infrastructure/database/knex/config');
+const { z }                   = require('zod');
 
 const firebaseAuth = new FirebaseAuthAdapter();
-const auth         = [firebaseAuthMiddleware, tenantMiddleware];
 
 const DEFAULT_PASSWORD = process.env.DEFAULT_USER_PASSWORD || 'Colombia2026*';
 
@@ -49,7 +47,7 @@ router.get('/', ...auth, roles('school_admin', 'coordinator'), async (req, res, 
   try {
     const users = await db('users')
       .where({ school_id: req.schoolId })
-      .select('id', 'first_name', 'last_name', 'email', 'role', 'phone_whatsapp', 'is_active', 'created_at')
+      .select('id', 'first_name', 'last_name', 'email', 'role', 'phone_whatsapp', 'document_number', 'is_active', 'created_at')
       .orderBy([{ column: 'role' }, { column: 'last_name' }]);
 
     // Para cada docente, cargar sus asignaciones

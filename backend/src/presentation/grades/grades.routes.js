@@ -1,15 +1,13 @@
 'use strict';
 
 const router = require('express').Router();
-const { firebaseAuthMiddleware } = require('../middlewares/firebaseAuth.middleware');
-const { tenantMiddleware }       = require('../middlewares/tenant.middleware');
-const { roles }                  = require('../middlewares/roles.middleware');
+const { auth }  = require('../middlewares/authMiddlewares');
+const { roles } = require('../middlewares/roles.middleware');
 const { validate }               = require('../middlewares/validate.middleware');
 const { BulkGradesSchema, GradeQuerySchema } = require('./grades.schema');
 const ctrl = require('./grades.controller');
 const db   = require('../../infrastructure/database/knex/config');
-
-const auth = [firebaseAuthMiddleware, tenantMiddleware];
+const { requireOpenPeriod } = require('../middlewares/requireOpenPeriod.middleware');
 
 /**
  * POST /api/v1/grades/bulk
@@ -20,6 +18,7 @@ router.post(
   ...auth,
   roles('teacher', 'coordinator', 'school_admin'),
   validate(BulkGradesSchema),
+  requireOpenPeriod,
   ctrl.bulkSave
 );
 

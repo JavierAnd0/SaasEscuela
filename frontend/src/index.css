@@ -2,56 +2,117 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CSS variables para branding por colegio — sobrescritas desde TenantBranding */
+/* ── Google Fonts: Inter ─────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Materialize 2.0.1 design tokens ────────────────────────────────────── */
 :root {
-  --color-primary:    #1e3a8a;
-  --color-primary-light: #3b82f6;
+  --color-primary:       #666cff;
+  --color-primary-light: #a5a7ff;
+  --color-body-bg:       #f7f7f9;
+  --color-card-bg:       #ffffff;
+  --color-base:          #262b43;
+  --color-muted:         #6d788d;
+  --color-menu-bg:       #282a42;
+  --color-menu-text:     #d7d8ee;
+  --color-border:        rgba(38,43,67,0.12);
+  --shadow-card:         0 0.25rem 0.875rem 0 rgba(38,43,67,0.16);
+  --radius-card:         0.625rem;
+  --navbar-height:       4rem;
+  --menu-width:          16.25rem;
+  --menu-width-collapsed:4.375rem;
 }
 
+/* ── Base ────────────────────────────────────────────────────────────────── */
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 font-sans antialiased;
+    background-color: var(--color-body-bg);
+    color: var(--color-base);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--color-base);
+    font-weight: 600;
+  }
+
+  a {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+  a:hover {
+    color: #5257e6;
   }
 }
 
+/* ── Components ──────────────────────────────────────────────────────────── */
 @layer components {
-  /* Botones base */
+
+  /* Cards — Materialize style: no border, rounded-xl, card shadow */
+  .card {
+    background-color: var(--color-card-bg);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Buttons */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
-           bg-primary-800 text-white text-sm font-medium
-           hover:bg-primary-900 active:scale-95
-           disabled:opacity-50 disabled:cursor-not-allowed
+           text-white text-sm font-medium
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
            transition-all duration-150;
+    background-color: var(--color-primary);
   }
+  .btn-primary:hover { background-color: #5257e6; }
+
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
-           bg-white text-gray-700 text-sm font-medium border border-gray-300
+           bg-white text-sm font-medium border
            hover:bg-gray-50 active:scale-95
            disabled:opacity-50 disabled:cursor-not-allowed
            transition-all duration-150;
+    color: var(--color-base);
+    border-color: var(--color-border);
   }
+
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
-           bg-red-600 text-white text-sm font-medium
-           hover:bg-red-700 active:scale-95
+           bg-danger text-white text-sm font-medium
+           hover:bg-danger-dark active:scale-95
            disabled:opacity-50 disabled:cursor-not-allowed
            transition-all duration-150;
   }
 
-  /* Cards */
-  .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  /* Form inputs — Materialize look */
+  .input {
+    @apply w-full rounded-lg border px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 transition-shadow;
+    border-color: var(--color-border);
+    color: var(--color-base);
+    background-color: var(--color-card-bg);
+  }
+  .input:focus {
+    border-color: var(--color-primary);
+    --tw-ring-color: rgba(102,108,255,0.25);
   }
 
-  /* Badges de nivel SIEE */
+  /* Badges — SIEE niveles */
   .badge-superior  { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800; }
   .badge-alto      { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800; }
   .badge-basico    { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800; }
   .badge-bajo      { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800; }
 
-  /* Badges de asistencia */
+  /* Badges — Asistencia */
   .badge-presente      { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800; }
   .badge-justificada   { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800; }
   .badge-injustificada { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800; }
   .badge-tardanza      { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800; }
+
+  /* Divider */
+  .divider {
+    @apply border-t my-4;
+    border-color: var(--color-border);
+  }
 }

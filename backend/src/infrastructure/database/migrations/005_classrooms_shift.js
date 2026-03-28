@@ -8,13 +8,17 @@
  */
 
 exports.up = async (knex) => {
-  await knex.schema.alterTable('classrooms', (t) => {
-    // mañana | tarde | noche | única | sabatina
-    t.string('shift', 30).defaultTo('única').notNullable().alter();
-  });
+  const hasShift = await knex.schema.hasColumn('classrooms', 'shift');
+
+  if (!hasShift) {
+    await knex.schema.alterTable('classrooms', (t) => {
+      // mañana | tarde | noche | única | sabatina
+      t.string('shift', 30).defaultTo('única').notNullable();
+    });
+  }
 
   // Para classrooms existentes que no tengan shift, asignar 'única'
-  await knex('classrooms').whereNull('shift').update({ shift: 'única' });
+  await knex.raw(`UPDATE classrooms SET shift = 'única' WHERE shift IS NULL`);
 };
 
 exports.down = async (knex) => {

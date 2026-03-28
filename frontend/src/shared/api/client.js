@@ -25,6 +25,10 @@ apiClient.interceptors.response.use(
       // Si persiste, redirigir al login
       window.location.href = '/login';
     }
+    if (error.response?.status === 402) {
+      // Suscripción vencida o suspendida — mostrar página informativa
+      window.location.href = '/subscription-required';
+    }
     return Promise.reject(error);
   }
 );

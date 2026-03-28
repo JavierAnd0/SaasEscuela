@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { GraduationCap } from 'lucide-react';
 import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
 
@@ -106,12 +106,12 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-4 text-center">
-            <a
-              href="/forgot-password"
+            <Link
+              to="/forgot-password"
               className="text-sm text-primary-700 hover:text-primary-900 hover:underline"
             >
               ¿Olvidó su contraseña?
-            </a>
+            </Link>
           </div>
         </div>
 

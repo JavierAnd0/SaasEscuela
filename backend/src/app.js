@@ -21,6 +21,7 @@ const consolidationRouter = require('./presentation/consolidation/consolidation.
 const commentsRouter      = require('./presentation/comments/comments.routes');
 const reportCardsRouter   = require('./presentation/report-cards/report-cards.routes');
 const deliveryRouter      = require('./presentation/delivery/delivery.routes');
+const portalRouter        = require('./presentation/portal/portal.routes');
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use('/api/v1/consolidation', consolidationRouter);
 app.use('/api/v1/comments',      commentsRouter);
 app.use('/api/v1/report-cards',  reportCardsRouter);
 app.use('/api/v1/delivery',      deliveryRouter);
+app.use('/api/v1/portal',        portalRouter);
 // Static file serving for generated PDFs — requiere token válido para cada archivo.
 // En producción los PDFs deben servirse desde Cloudflare R2 con URLs firmadas.
 // Este middleware es solo para desarrollo local; no exponer en producción sin auth.

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find '/c/Users/Javier connor/IdeaProjects/SaasColegio/SaasEscuela' -not -path */node_modules/* -not -path */.git/* -type d)",
+      "Bash(grep -r \"saveMany\\\\|save\\(\" /c/Users/Javier connor/IdeaProjects/SaasColegio/SaasEscuela/backend/src/infrastructure/database/knex --include=*Grade*.js -A 10)"
+    ]
+  }
+}

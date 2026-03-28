@@ -3,6 +3,7 @@ import { ClipboardList } from 'lucide-react';
 import AttendanceGrid from '../components/AttendanceGrid';
 import { attendanceApi } from '../api/attendance.api';
 import apiClient from '../../../shared/api/client';
+import SetupRequiredBanner from '../../../shared/components/SetupRequiredBanner';
 export default function AttendanceEntryPage() {
   // Filtros
   const [classrooms,   setClassrooms]   = useState([]);
@@ -14,14 +15,23 @@ export default function AttendanceEntryPage() {
   // Datos
   const [students,     setStudents]      = useState([]);
   const [existingRecs, setExistingRecs]  = useState({});
+  const [loadingInit,  setLoadingInit]   = useState(true);
   const [loadingData,  setLoadingData]   = useState(false);
   const [saving,       setSaving]        = useState(false);
   const [toast,        setToast]         = useState(null);
 
   // Carga grupos y períodos al montar
   useEffect(() => {
-    apiClient.get('/classrooms').then(r => setClassrooms(r.data?.data || [])).catch(() => {});
-    apiClient.get('/periods').then(r => setPeriods(r.data?.data   || [])).catch(() => {});
+    Promise.all([
+      apiClient.get('/classrooms'),
+      apiClient.get('/periods'),
+    ])
+      .then(([clRes, perRes]) => {
+        setClassrooms(clRes.data?.data  || []);
+        setPeriods(perRes.data?.data    || []);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingInit(false));
   }, []);
 
   // Carga estudiantes y asistencia existente al cambiar filtros
@@ -60,6 +70,32 @@ export default function AttendanceEntryPage() {
       setSaving(false);
     }
   };
+
+  if (loadingInit) {
+    return (
+      <div className="flex items-center justify-center h-48 text-gray-400 gap-2 text-sm">
+        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+        Cargando…
+      </div>
+    );
+  }
+
+  if (periods.length === 0) {
+    return (
+      <div className="max-w-4xl">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <ClipboardList size={24} className="text-primary-600" />
+            Registro de Asistencia
+          </h1>
+        </div>
+        <SetupRequiredBanner />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl">

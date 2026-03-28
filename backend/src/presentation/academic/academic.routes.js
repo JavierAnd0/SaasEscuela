@@ -1,14 +1,12 @@
 'use strict';
 
 const router = require('express').Router();
-const { firebaseAuthMiddleware } = require('../middlewares/firebaseAuth.middleware');
-const { tenantMiddleware }       = require('../middlewares/tenant.middleware');
-const { roles }                  = require('../middlewares/roles.middleware');
-const { validate }               = require('../middlewares/validate.middleware');
-const { z }                      = require('zod');
-const db                         = require('../../infrastructure/database/knex/config');
+const { auth }  = require('../middlewares/authMiddlewares');
+const { roles } = require('../middlewares/roles.middleware');
+const { validate } = require('../middlewares/validate.middleware');
+const { z }     = require('zod');
+const db        = require('../../infrastructure/database/knex/config');
 
-const auth      = [firebaseAuthMiddleware, tenantMiddleware];
 const coordAuth = [...auth, roles('coordinator', 'school_admin')];
 
 // ─── Schemas de validación ────────────────────────────────────────────────────
@@ -70,16 +68,38 @@ router.get('/classrooms', ...auth, roles('teacher', 'coordinator', 'school_admin
 });
 
 /**
- * GET /api/v1/periods
+ * GET /api/v1/academic-years
+ */
+router.get('/academic-years', ...auth, roles('teacher', 'coordinator', 'school_admin'), async (req, res, next) => {
+  try {
+    const years = await db('academic_years')
+      .where({ school_id: req.schoolId })
+      .select('id', 'name', 'start_date', 'end_date', 'is_active')
+      .orderBy('name', 'desc');
+    res.json({ data: years });
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /api/v1/periods?yearId=  (si no se pasa yearId, usa el año activo)
  */
 router.get('/periods', ...auth, roles('teacher', 'coordinator', 'school_admin'), async (req, res, next) => {
   try {
-    const periods = await db('periods as p')
+    const { yearId } = req.query;
+
+    let query = db('periods as p')
       .join('academic_years as ay', 'ay.id', 'p.academic_year_id')
-      .where({ 'p.school_id': req.schoolId, 'ay.is_active': true })
-      .select('p.id', 'p.name', 'p.period_number', 'p.start_date', 'p.end_date', 'p.weight_percent', 'p.is_closed')
+      .where('p.school_id', req.schoolId)
+      .select('p.id', 'p.name', 'p.period_number', 'p.start_date', 'p.end_date', 'p.weight_percent', 'p.is_closed', 'p.academic_year_id')
       .orderBy('p.period_number');
-    res.json({ data: periods });
+
+    if (yearId) {
+      query = query.where('p.academic_year_id', yearId);
+    } else {
+      query = query.where('ay.is_active', true);
+    }
+
+    res.json({ data: await query });
   } catch (err) { next(err); }
 });
 
@@ -283,6 +303,154 @@ router.delete('/subjects/:id', ...coordAuth, async (req, res, next) => {
     if (err.code === '23503') return res.status(409).json({ error: 'La materia tiene notas registradas. No se puede eliminar.' });
     next(err);
   }
+});
+
+// ─── Gestión de Años Académicos ───────────────────────────────────────────────
+
+const AcademicYearSchema = z.object({
+  name:      z.string().min(4).max(10),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD'),
+  endDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD'),
+});
+
+/**
+ * POST /api/v1/academic-years
+ */
+router.post('/academic-years', ...coordAuth, validate(AcademicYearSchema), async (req, res, next) => {
+  try {
+    const [year] = await db('academic_years')
+      .insert({
+        school_id:  req.schoolId,
+        name:       req.body.name,
+        start_date: req.body.startDate,
+        end_date:   req.body.endDate,
+        is_active:  false,
+      })
+      .returning('*');
+    res.status(201).json({ data: year });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Ya existe un año con ese nombre.' });
+    next(err);
+  }
+});
+
+/**
+ * PUT /api/v1/academic-years/:id/activate — activa un año (desactiva todos los demás)
+ */
+router.put('/academic-years/:id/activate', ...coordAuth, async (req, res, next) => {
+  try {
+    const year = await db('academic_years')
+      .where({ id: req.params.id, school_id: req.schoolId }).first();
+    if (!year) return res.status(404).json({ error: 'Año académico no encontrado.' });
+
+    await db.transaction(async (trx) => {
+      await trx('academic_years').where({ school_id: req.schoolId }).update({ is_active: false });
+      await trx('academic_years').where({ id: req.params.id }).update({ is_active: true });
+    });
+
+    const updated = await db('academic_years').where({ id: req.params.id }).first();
+    res.json({ data: updated });
+  } catch (err) { next(err); }
+});
+
+// ─── Gestión de Periodos ──────────────────────────────────────────────────────
+
+const PeriodSchema = z.object({
+  name:          z.string().min(1).max(50),
+  periodNumber:  z.number().int().min(1).max(8),
+  startDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  endDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  weightPercent: z.number().min(0).max(100),
+  academicYearId: z.string().uuid(),
+});
+
+/**
+ * POST /api/v1/periods
+ */
+router.post('/periods', ...coordAuth, validate(PeriodSchema), async (req, res, next) => {
+  try {
+    const year = await db('academic_years')
+      .where({ id: req.body.academicYearId, school_id: req.schoolId }).first();
+    if (!year) return res.status(404).json({ error: 'Año académico no encontrado.' });
+
+    const [period] = await db('periods')
+      .insert({
+        school_id:        req.schoolId,
+        academic_year_id: req.body.academicYearId,
+        period_number:    req.body.periodNumber,
+        name:             req.body.name,
+        start_date:       req.body.startDate || null,
+        end_date:         req.body.endDate   || null,
+        weight_percent:   req.body.weightPercent,
+        is_closed:        false,
+      })
+      .returning('*');
+    res.status(201).json({ data: period });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Ya existe un periodo con ese número en este año.' });
+    next(err);
+  }
+});
+
+const PeriodUpdateSchema = z.object({
+  name:          z.string().min(1).max(50).optional(),
+  periodNumber:  z.number().int().min(1).max(8).optional(),
+  startDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  endDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  weightPercent: z.number().min(0).max(100).optional(),
+});
+
+/**
+ * PUT /api/v1/periods/:id
+ */
+router.put('/periods/:id', ...coordAuth, validate(PeriodUpdateSchema), async (req, res, next) => {
+  try {
+    const updates = {};
+    if (req.body.name          !== undefined) updates.name           = req.body.name;
+    if (req.body.periodNumber  !== undefined) updates.period_number  = req.body.periodNumber;
+    if (req.body.startDate     !== undefined) updates.start_date     = req.body.startDate || null;
+    if (req.body.endDate       !== undefined) updates.end_date       = req.body.endDate   || null;
+    if (req.body.weightPercent !== undefined) updates.weight_percent = req.body.weightPercent;
+
+    const [period] = await db('periods')
+      .where({ id: req.params.id, school_id: req.schoolId })
+      .update(updates)
+      .returning('*');
+    if (!period) return res.status(404).json({ error: 'Periodo no encontrado.' });
+    res.json({ data: period });
+  } catch (err) { next(err); }
+});
+
+/**
+ * DELETE /api/v1/periods/:id
+ */
+router.delete('/periods/:id', ...coordAuth, async (req, res, next) => {
+  try {
+    const count = await db('periods')
+      .where({ id: req.params.id, school_id: req.schoolId }).delete();
+    if (!count) return res.status(404).json({ error: 'Periodo no encontrado.' });
+    res.status(204).end();
+  } catch (err) {
+    if (err.code === '23503') return res.status(409).json({ error: 'El periodo tiene notas o asistencias registradas.' });
+    next(err);
+  }
+});
+
+/**
+ * POST /api/v1/periods/:id/close — alterna el estado abierto/cerrado del periodo
+ */
+router.post('/periods/:id/close', ...coordAuth, async (req, res, next) => {
+  try {
+    const period = await db('periods')
+      .where({ id: req.params.id, school_id: req.schoolId }).first();
+    if (!period) return res.status(404).json({ error: 'Periodo no encontrado.' });
+
+    const [updated] = await db('periods')
+      .where({ id: req.params.id })
+      .update({ is_closed: !period.is_closed, closed_at: !period.is_closed ? new Date() : null })
+      .returning('*');
+    res.json({ data: updated });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

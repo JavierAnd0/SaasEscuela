@@ -1,14 +1,11 @@
 'use strict';
 
 const router = require('express').Router();
-const { firebaseAuthMiddleware } = require('../middlewares/firebaseAuth.middleware');
-const { tenantMiddleware }       = require('../middlewares/tenant.middleware');
-const { roles }                  = require('../middlewares/roles.middleware');
-const { validate }               = require('../middlewares/validate.middleware');
-const { z }                      = require('zod');
-const ctrl                       = require('./delivery.controller');
-
-const auth = [firebaseAuthMiddleware, tenantMiddleware];
+const { auth }  = require('../middlewares/authMiddlewares');
+const { roles } = require('../middlewares/roles.middleware');
+const { validate } = require('../middlewares/validate.middleware');
+const { z }     = require('zod');
+const ctrl      = require('./delivery.controller');
 
 const SendSchema = z.object({
   classroomId: z.string().uuid(),

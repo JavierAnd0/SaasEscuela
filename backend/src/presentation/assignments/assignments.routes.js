@@ -1,14 +1,12 @@
 'use strict';
 
 const router = require('express').Router();
-const { firebaseAuthMiddleware } = require('../middlewares/firebaseAuth.middleware');
-const { tenantMiddleware }       = require('../middlewares/tenant.middleware');
-const { roles }                  = require('../middlewares/roles.middleware');
-const { validate }               = require('../middlewares/validate.middleware');
-const { z }                      = require('zod');
-const db                         = require('../../infrastructure/database/knex/config');
+const { auth }  = require('../middlewares/authMiddlewares');
+const { roles } = require('../middlewares/roles.middleware');
+const { validate } = require('../middlewares/validate.middleware');
+const { z }     = require('zod');
+const db        = require('../../infrastructure/database/knex/config');
 
-const auth      = [firebaseAuthMiddleware, tenantMiddleware];
 const coordAuth = [...auth, roles('coordinator', 'school_admin')];
 
 const AssignmentSchema = z.object({

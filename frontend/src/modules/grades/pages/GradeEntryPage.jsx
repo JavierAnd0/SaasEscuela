@@ -4,6 +4,7 @@ import apiClient       from '../../../shared/api/client';
 import { gradesApi }   from '../api/grades.api';
 import AssignmentTabs  from '../components/AssignmentTabs';
 import GradesGrid      from '../components/GradesGrid';
+import SetupRequiredBanner from '../../../shared/components/SetupRequiredBanner';
 
 export default function GradeEntryPage() {
   // — Datos de referencia —
@@ -150,6 +151,18 @@ export default function GradeEntryPage() {
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
         </svg>
         Cargando asignaciones…
+      </div>
+    );
+  }
+
+  if (periods.length === 0) {
+    return (
+      <div className="max-w-4xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Ingreso de Notas</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Escala colombiana · 1.0 – 5.0</p>
+        </div>
+        <SetupRequiredBanner />
       </div>
     );
   }

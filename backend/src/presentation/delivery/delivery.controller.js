@@ -17,6 +17,14 @@ const statusUseCase     = new GetDeliveryStatusUseCase(deliveryRepo);
 async function sendReportCards(req, res, next) {
   try {
     const { classroomId, periodId, channel = 'email' } = req.body;
+
+    if (channel !== 'email') {
+      return res.status(501).json({
+        error: `El canal "${channel}" no está disponible actualmente. Solo se admite "email".`,
+        code:  'CHANNEL_NOT_IMPLEMENTED',
+      });
+    }
+
     const result = await sendUseCase.execute({ schoolId: req.schoolId, classroomId, periodId, channel });
     res.json(result);
   } catch (err) { next(err); }

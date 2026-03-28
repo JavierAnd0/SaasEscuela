@@ -240,7 +240,11 @@ function UserModal({ user, classrooms, subjects, onClose, onSaved, showToast }) 
                       <select value={a.classroomId} onChange={e => updateAssignment(idx, 'classroomId', e.target.value)}
                         className="flex-1 text-sm rounded-lg border border-gray-300 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
                         <option value="">Grupo…</option>
-                        {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {classrooms.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.grade_level_name} {c.name}{c.shift ? ` — ${c.shift}` : ''}
+                          </option>
+                        ))}
                       </select>
                       <button type="button" onClick={() => removeAssignment(idx)}
                         className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0">
