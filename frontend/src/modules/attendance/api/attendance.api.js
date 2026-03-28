@@ -32,4 +32,10 @@ export const attendanceApi = {
   /** Actualizar/justificar un registro */
   update: (id, data) =>
     apiClient.put(`/attendance/${id}`, data),
+
+  /** Calendario mensual: ?classroomId=&subjectId=&year=&month= */
+  getCalendar: (classroomId, subjectId, year, month) =>
+    apiClient.get('/attendance/calendar', {
+      params: { classroomId, ...(subjectId ? { subjectId } : {}), year, month },
+    }),
 };

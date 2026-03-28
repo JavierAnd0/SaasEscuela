@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { GraduationCap, Users } from 'lucide-react';
 import { useFirebaseAuth } from '../../auth/hooks/useFirebaseAuth';
+import apiClient from '../../../shared/api/client';
 
 export default function PortalLoginPage() {
   const { login }  = useFirebaseAuth();
   const navigate   = useNavigate();
 
-  const [email,    setEmail]    = useState('');
+  const [cc,       setCc]       = useState('');
   const [password, setPassword] = useState('');
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
@@ -17,17 +18,23 @@ export default function PortalLoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      // 1. Obtener el email interno de Firebase a partir de la CC
+      const { data } = await apiClient.post('/portal/auth/lookup', { documentNumber: cc.trim() });
+      // 2. Autenticar contra Firebase con ese email
+      await login(data.email, password);
       navigate('/portal/home');
     } catch (err) {
-      const msg = {
-        'auth/invalid-credential':    'Email o contraseña incorrectos.',
-        'auth/user-not-found':         'No existe una cuenta con ese email.',
-        'auth/wrong-password':         'Contraseña incorrecta.',
-        'auth/too-many-requests':      'Demasiados intentos. Intente más tarde.',
-        'auth/network-request-failed': 'Error de red. Verifique su conexión.',
-      }[err.code] || 'Error al iniciar sesión. Intente nuevamente.';
-      setError(msg);
+      if (err.response?.status === 404) {
+        setError('No existe una cuenta para esa cédula. Consulte al colegio.');
+      } else {
+        const msg = {
+          'auth/invalid-credential':    'Cédula o contraseña incorrectos.',
+          'auth/wrong-password':         'Contraseña incorrecta.',
+          'auth/too-many-requests':      'Demasiados intentos. Intente más tarde.',
+          'auth/network-request-failed': 'Error de red. Verifique su conexión.',
+        }[err.code] || 'Error al iniciar sesión. Intente nuevamente.';
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -61,17 +68,18 @@ export default function PortalLoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Correo electrónico
+                Cédula del acudiente
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                inputMode="numeric"
+                value={cc}
+                onChange={(e) => setCc(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
                            focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                placeholder="padre@correo.com"
+                placeholder="Ej: 43567890"
                 required
-                autoComplete="email"
+                autoComplete="username"
               />
             </div>
 

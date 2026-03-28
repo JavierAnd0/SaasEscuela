@@ -118,10 +118,26 @@ function buildColumns({ setModal, setEnrollTarget, handleToggleActive }) {
   ];
 }
 
+// ─── Field helper (fuera del modal para evitar re-montaje en cada render) ─────
+
+function Field({ label, error, children }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-base)' }}>
+        {label}
+      </label>
+      {children}
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}
+
 // ─── Modal Crear / Editar ─────────────────────────────────────────────────────
 
-function StudentModal({ student, onClose, onSaved, showToast }) {
+function StudentModal({ student, onClose, onSaved, showToast, classrooms = [], academicYears = [] }) {
   const isEdit = !!student?.id;
+  const showEnroll = !isEdit && classrooms.length > 0;
+
   const [form, setForm] = useState(isEdit ? {
     firstName:            student.first_name,
     lastName:             student.last_name,
@@ -134,6 +150,7 @@ function StudentModal({ student, onClose, onSaved, showToast }) {
     parentPhone:          student.parent_phone          || '',
     parentDocumentNumber: student.parent_document_number || '',
   } : EMPTY_FORM);
+  const [enrollForm, setEnrollForm] = useState({ classroomId: '', academicYearId: '' });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -154,6 +171,8 @@ function StudentModal({ student, onClose, onSaved, showToast }) {
     ) {
       e.parentDocumentNumber = 'No puede ser igual al documento del estudiante';
     }
+    if (showEnroll && !enrollForm.classroomId)   e.classroomId   = 'Selecciona un grupo';
+    if (showEnroll && !enrollForm.academicYearId) e.academicYearId = 'Selecciona el año académico';
     return e;
   };
 
@@ -178,22 +197,36 @@ function StudentModal({ student, onClose, onSaved, showToast }) {
       const result = isEdit
         ? await studentsApi.update(student.id, payload)
         : await studentsApi.create(payload);
+      const savedStudent = result.data.data;
+      const parentAccount = result.data?.parentAccount;
+
       showToast(isEdit ? 'Estudiante actualizado.' : 'Estudiante creado.');
-      onSaved(result.data.data);
+      if (parentAccount?.ok && parentAccount.created) {
+        showToast(`Acudiente registrado. Contraseña: ${parentAccount.password}`, 'success');
+      } else if (parentAccount?.ok && !parentAccount.created) {
+        showToast(parentAccount.message, 'info');
+      } else if (parentAccount && !parentAccount.ok) {
+        showToast(`Cuenta acudiente: ${parentAccount.message}`, 'warning');
+      }
+
+      // Matrícula automática si se seleccionó grupo desde el overview
+      if (showEnroll && enrollForm.classroomId && enrollForm.academicYearId) {
+        try {
+          await studentsApi.enroll(savedStudent.id, enrollForm);
+          const enrolledClassroom = classrooms.find((c) => c.id === enrollForm.classroomId);
+          onSaved({ ...savedStudent, _enrolledClassroom: enrolledClassroom });
+        } catch (enrollErr) {
+          showToast(enrollErr.response?.data?.error || 'Estudiante creado pero no se pudo matricular.', 'warning');
+          onSaved(savedStudent);
+        }
+        return;
+      }
+
+      onSaved(savedStudent);
     } catch (err) {
       showToast(err.response?.data?.error || 'Error al guardar.', 'error');
     } finally { setSaving(false); }
   };
-
-  const Field = ({ label, error, children }) => (
-    <div>
-      <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-base)' }}>
-        {label}
-      </label>
-      {children}
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-    </div>
-  );
 
   return (
     <form id="student-form" onSubmit={handleSubmit} className="space-y-6">
@@ -232,27 +265,70 @@ function StudentModal({ student, onClose, onSaved, showToast }) {
         </div>
       </div>
 
+      {/* Matrícula — solo al crear desde el overview */}
+      {showEnroll && (
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-muted)' }}>
+            Matrícula <span className="text-red-500">*</span>
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label={<>Año Académico <span className="text-red-500">*</span></>} error={errors.academicYearId}>
+              <select
+                value={enrollForm.academicYearId}
+                onChange={(e) => setEnrollForm((f) => ({ ...f, academicYearId: e.target.value }))}
+                className={`input w-full ${errors.academicYearId ? 'border-red-400' : ''}`}
+              >
+                <option value="">Seleccionar…</option>
+                {academicYears.map((y) => (
+                  <option key={y.id} value={y.id}>{y.name}{y.is_active ? ' (activo)' : ''}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={<>Grupo <span className="text-red-500">*</span></>} error={errors.classroomId}>
+              <select
+                value={enrollForm.classroomId}
+                onChange={(e) => setEnrollForm((f) => ({ ...f, classroomId: e.target.value }))}
+                className={`input w-full ${errors.classroomId ? 'border-red-400' : ''}`}
+              >
+                <option value="">Seleccionar…</option>
+                {classrooms.map((c) => (
+                  <option key={c.id} value={c.id}>{c.grade_level_name} {c.name}{c.shift ? ` — ${c.shift}` : ''}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </div>
+      )}
+
       {/* Acudiente */}
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-muted)' }}>
           Contacto Acudiente
         </h3>
+
+        {/* Aviso portal */}
+        <div className="mb-3 flex items-start gap-2 rounded-lg px-3 py-2 text-xs border"
+          style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1e40af' }}>
+          <span className="mt-0.5">ℹ️</span>
+          <span>Con solo la <strong>CC del Acudiente</strong> se crea automáticamente la cuenta del Portal de Padres. El sistema genera una contraseña aleatoria que verás al guardar.</span>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Nombre del Acudiente">
             <input value={form.parentName} onChange={(e) => set('parentName', e.target.value)}
               className="input w-full" placeholder="Ej: María Torres" />
           </Field>
-          <Field label={<>CC del Acudiente <span className="text-xs font-normal" style={{ color: 'var(--color-muted)' }}>(para portal)</span></>}>
-            <input value={form.parentDocumentNumber} onChange={(e) => set('parentDocumentNumber', e.target.value)}
-              className="input w-full" placeholder="Ej: 43567890" />
-          </Field>
-          <Field label="Correo" error={errors.parentEmail}>
-            <input type="email" value={form.parentEmail} onChange={(e) => set('parentEmail', e.target.value)}
-              className={`input w-full ${errors.parentEmail ? 'border-red-400' : ''}`} placeholder="padre@email.com" />
-          </Field>
           <Field label="Teléfono (WhatsApp)">
             <input value={form.parentPhone} onChange={(e) => set('parentPhone', e.target.value)}
               className="input w-full" placeholder="+573001234567" />
+          </Field>
+          <Field label="Correo del Acudiente (opcional)" error={errors.parentEmail}>
+            <input type="email" value={form.parentEmail} onChange={(e) => set('parentEmail', e.target.value)}
+              className={`input w-full ${errors.parentEmail ? 'border-red-400' : ''}`} placeholder="padre@email.com" />
+          </Field>
+          <Field label={<>CC del Acudiente <span className="text-xs font-normal" style={{ color: '#1e40af' }}>← activa el portal</span></>} error={errors.parentDocumentNumber}>
+            <input value={form.parentDocumentNumber} onChange={(e) => set('parentDocumentNumber', e.target.value)}
+              className={`input w-full ${errors.parentDocumentNumber ? 'border-red-400' : ''}`} placeholder="Ej: 43567890" />
           </Field>
         </div>
       </div>
@@ -453,6 +529,7 @@ function ClassroomCard({ classroom, onSelect }) {
 export default function StudentsPage() {
   // Vista overview
   const [classrooms,        setClassrooms]        = useState([]);
+  const [academicYears,     setAcademicYears]     = useState([]);
   const [classroomsLoading, setClassroomsLoading] = useState(true);
   const [selectedClassroom, setSelectedClassroom] = useState(null); // null = overview
 
@@ -476,10 +553,16 @@ export default function StudentsPage() {
   const searchTimer  = useRef(null);
   const [toast, showToast, dismissToast] = useToast();
 
-  // ── Carga grupos al montar ─────────────────────────────────────────────────
+  // ── Carga grupos y años académicos al montar ──────────────────────────────
   useEffect(() => {
-    academicApi.getClassrooms()
-      .then((res) => setClassrooms(res.data.data || []))
+    Promise.all([
+      academicApi.getClassrooms(),
+      apiClient.get('/academic-years'),
+    ])
+      .then(([crRes, ayRes]) => {
+        setClassrooms(crRes.data.data || []);
+        setAcademicYears(ayRes.data.data || []);
+      })
       .catch(() => showToast('Error al cargar grupos.', 'error'))
       .finally(() => setClassroomsLoading(false));
   }, []);
@@ -544,12 +627,17 @@ export default function StudentsPage() {
   };
 
   const handleSaved = (savedStudent) => {
+    setModal(null);
+    // Si se matriculó en un grupo desde el overview, navegar a ese grupo
+    if (savedStudent._enrolledClassroom) {
+      handleSelectClassroom(savedStudent._enrolledClassroom);
+      return;
+    }
     setStudents((prev) => {
       const idx = prev.findIndex((s) => s.id === savedStudent.id);
       if (idx >= 0) { const next = [...prev]; next[idx] = savedStudent; return next; }
       return [savedStudent, ...prev];
     });
-    setModal(null);
     if (!savedStudent._edit) setMeta((m) => m ? { ...m, total: m.total + 1 } : m);
   };
 
@@ -693,6 +781,8 @@ export default function StudentsPage() {
               onClose={() => setModal(null)}
               onSaved={handleSaved}
               showToast={showToast}
+              classrooms={classrooms}
+              academicYears={academicYears}
             />
           )}
         </Modal>
